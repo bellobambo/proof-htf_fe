@@ -1,3 +1,6 @@
+export const CONTRACT_ADDRESS ="0x179BF34155cD129FeB3b2440f50418C4836e65D6" as `0x${string}`;
+
+
 export const CONTRACT_ABI = [
 
       {
