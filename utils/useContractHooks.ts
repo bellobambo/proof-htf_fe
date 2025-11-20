@@ -480,7 +480,7 @@ export function useRegisteredUsers(userAddress: `0x${string}` | undefined) {
 }
 
 export function useUsers(userAddress: `0x${string}` | undefined) {
-  return useReadContract({
+  const result = useReadContract({
     address: CONTRACT_ADDRESS,
     abi: CONTRACT_ABI,
     functionName: "users",
@@ -489,6 +489,22 @@ export function useUsers(userAddress: `0x${string}` | undefined) {
       enabled: !!userAddress,
     },
   });
+
+  type UserResponse = readonly [string, number, boolean] | undefined;
+  const userResponse = result.data as UserResponse;
+
+  const transformedData: User | undefined = userResponse
+    ? {
+        name: userResponse[0],
+        role: userResponse[1] as UserRole,
+        isRegistered: userResponse[2],
+      }
+    : undefined;
+
+  return {
+    ...result,
+    data: transformedData,
+  };
 }
 
 // Keep all your existing write hooks exactly as they are...
