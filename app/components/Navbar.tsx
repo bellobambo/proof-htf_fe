@@ -25,10 +25,9 @@ export default function Navbar() {
         return etherValue.toFixed(4);
     };
 
-    // Get user role display name
     const getUserRole = () => {
         if (!userData?.isRegistered) return "Unregistered";
-        return userData.role === 0 ? "Student" : "Tutor";
+        return userData.role === 0 ? "Tutor" : "Student";
     };
 
     // Get user name or fallback

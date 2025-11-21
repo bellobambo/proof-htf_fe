@@ -6,9 +6,9 @@ import {
   useWaitForTransactionReceipt,
 } from "wagmi";
 import { CONTRACT_ABI, CONTRACT_ADDRESS } from "./contract";
-import { useEffect, useMemo } from "react";
+import { useMemo } from "react";
 
-// Reuse existing interfaces and enums from your documentation
+// Reuse existing interfaces and enums
 export enum UserRole {
   TUTOR = 0,
   STUDENT = 1,
@@ -86,54 +86,32 @@ export interface ExamAnswersComparison {
 
 export type QuestionOptions = [string, string, string, string];
 
+// FIXED: Return only the course count, not individual courses
+// Let the component handle fetching individual courses
 export function useGetAllCourses() {
   const {
     data: courseCount,
-    error: countError,
-    isLoading: countLoading,
+    error,
+    isLoading,
   } = useCourseCounter();
 
-  // Create an array of course IDs from 0 to courseCount-1
-  const courseIds = useMemo(() => {
-    if (!courseCount) return [];
-    return Array.from({ length: Number(courseCount) }, (_, i) => BigInt(i));
-  }, [courseCount]);
-
-  // Fetch each course individually
-  const courseQueries = courseIds.map((courseId: any) =>
-    useGetCourse(courseId)
-  );
-
-  // Combine all course data
-  const courses: Course[] = useMemo(() => {
-    return courseQueries
-      .map((query: any) => query.data)
-      .filter(
-        (course: any): course is Course =>
-          course !== undefined && course.isActive
-      );
-  }, [courseQueries]);
-
-  const isLoading =
-    countLoading || courseQueries.some((query: any) => query.isLoading);
-  const error =
-    countError || courseQueries.find((query: any) => query.error)?.error;
+  const count = courseCount ? Number(courseCount) : 0;
 
   return {
-    data: courses,
+    courseCount: count,
     isLoading,
     error,
   };
 }
 
-// Fixed implementation for getting available exams for a student
+// FIXED: Return metadata instead of fetching all exams
+// Let the component handle individual exam fetches
 export function useGetAvailableExamsForStudent(
   studentAddress: `0x${string}` | undefined,
   options?: { query?: { enabled?: boolean } }
 ) {
   const enabled = options?.query?.enabled ?? !!studentAddress;
 
-  // Get enrolled courses for the student
   const {
     data: enrolledCourses,
     isLoading: coursesLoading,
@@ -142,79 +120,20 @@ export function useGetAvailableExamsForStudent(
     query: { enabled },
   });
 
-  // Get exam counter to know how many exams exist
   const { data: examCount, isLoading: examCountLoading } = useExamCounter();
 
-  // Create array of all exam IDs
-  const allExamIds = useMemo(() => {
+  const examIds = useMemo(() => {
     if (!examCount) return [];
     return Array.from({ length: Number(examCount) }, (_, i) => BigInt(i));
   }, [examCount]);
 
-  // Fetch all exams
-  const examQueries = allExamIds.map((examId: any) => useGetExam(examId));
-
-  // Fetch exam sessions for the student
-  const examSessionQueries = allExamIds.map((examId: any) =>
-    useExamSessions(examId, studentAddress)
-  );
-
-  // Combine data to find available exams
-  const availableExams: ExamWithStatus[] = useMemo(() => {
-    if (!enrolledCourses || !examQueries.length) return [];
-
-    const enrolledCourseIds = new Set(
-      enrolledCourses.map((course) => course.courseId)
-    );
-
-    const results = examQueries.map((query: any, index: any) => {
-      const exam = query.data;
-      const sessionData = examSessionQueries[index]?.data;
-
-      if (!exam || !exam.isActive) return null;
-
-      // Convert tuple to ExamSession object
-      const session: ExamSession | null = sessionData
-        ? {
-            examId: sessionData[0],
-            student: sessionData[1],
-            score: sessionData[2],
-            isCompleted: sessionData[3],
-          }
-        : null;
-
-      // Check if exam belongs to an enrolled course and student hasn't completed it
-      const isEnrolled = enrolledCourseIds.has(exam.courseId);
-      const isCompleted = session?.isCompleted ?? false;
-
-      if (isEnrolled && !isCompleted) {
-        return {
-          exam,
-          completionStatus: isCompleted,
-          score: session?.score ?? BigInt(0),
-        } as ExamWithStatus; // Explicit type assertion here
-      }
-
-      return null;
-    });
-
-    // Use filter with Boolean and type assertion
-    return results.filter(Boolean) as ExamWithStatus[];
-  }, [enrolledCourses, examQueries, examSessionQueries]);
-
-  const isLoading =
-    coursesLoading ||
-    examCountLoading ||
-    examQueries.some((query: any) => query.isLoading) ||
-    examSessionQueries.some((query: any) => query.isLoading);
-
-  const error =
-    coursesError || examQueries.find((query: any) => query.error)?.error;
+  const isLoading = coursesLoading || examCountLoading;
 
   return {
-    data: availableExams,
+    examIds,
+    enrolledCourses,
     isLoading,
-    error,
+    error: coursesError,
   };
 }
 
@@ -507,7 +426,6 @@ export function useUsers(userAddress: `0x${string}` | undefined) {
   };
 }
 
-// Keep all your existing write hooks exactly as they are...
 export function useCreateCourse() {
   const { data: hash, writeContract, isPending, error } = useWriteContract();
 
