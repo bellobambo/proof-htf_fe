@@ -1,6 +1,8 @@
 "use client";
 
 import { toast } from "react-hot-toast";
+import { DownloadOutlined } from "@ant-design/icons";
+
 
 interface ExamTemplateProps {
   onImport: (file: File) => void;
@@ -79,27 +81,27 @@ QUESTIONS:
 // Function to parse uploaded TXT file
 const parseTemplateFile = (content: string) => {
   const lines = content.split('\n').map(line => line.trim()).filter(line => line);
-  
+
   let examTitle = "";
   const questions: { text: string; options: [string, string, string, string]; correctAnswer: number }[] = [];
-  
+
   let currentQuestion: any = null;
   let optionIndex = 0;
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
-    
+
     // Extract exam title
     if (line.startsWith('EXAM TITLE:')) {
       examTitle = line.replace('EXAM TITLE:', '').trim().replace(/^\[.*\]$/, '').trim();
       continue;
     }
-    
+
     // Skip instructions and example sections
     if (line === 'INSTRUCTIONS:' || line === 'EXAMPLE:' || line === 'EXAM TEMPLATE' || line.includes('===')) {
       continue;
     }
-    
+
     // Detect question number (e.g., "1.", "2.")
     const questionMatch = line.match(/^(\d+)\.\s*(.+[?])$/);
     if (questionMatch) {
@@ -107,7 +109,7 @@ const parseTemplateFile = (content: string) => {
       if (currentQuestion && currentQuestion.text && currentQuestion.options.every((opt: string) => opt.trim())) {
         questions.push(currentQuestion);
       }
-      
+
       currentQuestion = {
         text: questionMatch[2].trim(),
         options: ['', '', '', ''],
@@ -116,21 +118,21 @@ const parseTemplateFile = (content: string) => {
       optionIndex = 0;
       continue;
     }
-    
+
     // Detect options (a), b), c), d)
     const optionMatch = line.match(/^([a-d])\)\s*(.+)$/);
     if (optionMatch && currentQuestion) {
       const optLetter = optionMatch[1];
       const optText = optionMatch[2].trim();
       const optIndex = ['a', 'b', 'c', 'd'].indexOf(optLetter);
-      
+
       if (optIndex >= 0 && optIndex < 4) {
         currentQuestion.options[optIndex] = optText;
         optionIndex++;
       }
       continue;
     }
-    
+
     // Detect correct answer (a, b, c, d)
     const answerMatch = line.match(/Correct Answer:\s*([a-d])/i);
     if (answerMatch && currentQuestion) {
@@ -138,19 +140,19 @@ const parseTemplateFile = (content: string) => {
       currentQuestion.correctAnswer = ['a', 'b', 'c', 'd'].indexOf(answerLetter);
       continue;
     }
-    
+
     // If we're in a question block and line doesn't match patterns, it might be continuation of question text
-    if (currentQuestion && !line.match(/^[a-d]\)/) && !line.match(/Correct Answer:/i) && 
-        !line.match(/^\d+\./) && line !== '' && !currentQuestion.text.endsWith('?')) {
+    if (currentQuestion && !line.match(/^[a-d]\)/) && !line.match(/Correct Answer:/i) &&
+      !line.match(/^\d+\./) && line !== '' && !currentQuestion.text.endsWith('?')) {
       currentQuestion.text += ' ' + line;
     }
   }
-  
+
   // Add the last question
   if (currentQuestion && currentQuestion.text && currentQuestion.options.every((opt: string) => opt.trim())) {
     questions.push(currentQuestion);
   }
-  
+
   return { examTitle, questions };
 };
 
@@ -161,7 +163,7 @@ export default function ExamTemplate({ onImport, disabled = false }: ExamTemplat
       try {
         const content = e.target?.result as string;
         const { examTitle, questions } = parseTemplateFile(content);
-        
+
         if (questions.length > 0) {
           onImport(file);
           toast.success(`Successfully imported ${questions.length} questions from template!`);
@@ -177,14 +179,15 @@ export default function ExamTemplate({ onImport, disabled = false }: ExamTemplat
   };
 
   return (
-    <div className="  rounded-lg border-2">
-      <div className="flex mb-4 gap-2">
-        <button 
+    <div className="rounded-lg border-2 p-4 ">
+      <div className="flex items-center gap-2">
+        <button
           onClick={downloadTemplate}
           disabled={disabled}
-          className="flex-1 py-2 bg-[#8B4513] text-[#F5F5DC] rounded-lg hover:bg-[#654321] transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+          className="flex-1 py-2 cursor-pointer bg-[#8B4513] text-[#F5F5DC] rounded-lg hover:bg-[#654321] transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium h-[42px] text-sm whitespace-nowrap px-3 flex items-center justify-center gap-2"
         >
-          Download TXT Template
+          <DownloadOutlined className="text-[16px]" />
+          Download Template
         </button>
         <label className="flex-1">
           <input
@@ -195,16 +198,15 @@ export default function ExamTemplate({ onImport, disabled = false }: ExamTemplat
               if (file) {
                 handleFileUpload(file);
               }
-              // Reset input
               e.target.value = '';
             }}
             disabled={disabled}
             className="hidden"
           />
-          <div 
-            className={`w-full py-2 border-2 border-[#8B4513] text-[#8B4513] rounded-lg hover:border-[#654321] hover:bg-[#F5F5DC]/50 transition-colors text-center cursor-pointer font-medium ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+          <div
+            className={`w-full py-2 border-2 border-[#8B4513] text-[#8B4513] rounded-lg hover:border-[#654321] hover:bg-[#8B4513] hover:text-[#F5F5DC] transition-colors text-center cursor-pointer font-medium h-[42px] flex items-center justify-center text-sm whitespace-nowrap px-3 ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
           >
-            Upload TXT File
+            Upload File
           </div>
         </label>
       </div>

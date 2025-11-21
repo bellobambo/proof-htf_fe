@@ -5,7 +5,7 @@ import { motion } from "framer-motion";
 import { Drawer, Button, Radio, Space } from "antd";
 import { useAccount } from "wagmi";
 import { toast } from "react-hot-toast";
-import { 
+import {
   useGetAvailableExamsForStudent,
   useGetTutorCourses,
   useUsers,
@@ -16,18 +16,20 @@ import {
   useCreateExam,
   useGetExam,
   useExamSessions,
-  Exam
+  Exam,
+  Course,
+  useGetCourse // Add this import
 } from "@/utils/useContractHooks";
 
-// Individual exam card component to properly use hooks
-function ExamCard({ 
-  examId, 
-  index, 
+// Individual exam card component for students
+function StudentExamCard({
+  examId,
+  index,
   enrolledCourseIds,
   studentAddress,
-  onClick 
-}: { 
-  examId: bigint; 
+  onClick
+}: {
+  examId: bigint;
   index: number;
   enrolledCourseIds: Set<bigint>;
   studentAddress: `0x${string}` | undefined;
@@ -44,7 +46,7 @@ function ExamCard({
         transition={{ delay: index * 0.1 }}
         className="bg-[#F5F5DC] p-6 rounded-xl border-2 border-[#8D6E63]"
       >
-        <div className="text-[#5D4037]">Loading exam...</div>
+        <div className="text-[#8B4513]">Loading exam...</div>
       </motion.div>
     );
   }
@@ -92,32 +94,83 @@ function ExamCard({
   );
 }
 
+// Individual exam card component for tutors
+function TutorExamCard({
+  examId,
+  index,
+  tutorAddress
+}: {
+  examId: bigint;
+  index: number;
+  tutorAddress: `0x${string}` | undefined;
+}) {
+  const { data: exam, isLoading } = useGetExam(examId);
+  const { data: course } = useGetCourse(exam?.courseId); // Use the imported hook
+
+  if (isLoading) {
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: index * 0.1 }}
+        className="bg-[#F5F5DC] p-6 rounded-xl border-2 border-[#8D6E63]"
+      >
+        <div className="text-[#5D4037]">Loading exam...</div>
+      </motion.div>
+    );
+  }
+
+  if (!exam || !exam.isActive || exam.creator !== tutorAddress) {
+    return null;
+  }
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: index * 0.1 }}
+      className="bg-[#F5F5DC] p-6 rounded-xl border-2 border-[#8D6E63] hover:border-[#5D4037] transition-colors"
+    >
+      <h3 className="text-xl font-semibold text-[#5D4037] mb-2">
+        {exam.title}
+      </h3>
+      <p className="text-[#6D4C41] mb-2">
+        Questions: {exam.questionCount.toString()}
+      </p>
+      <p className="text-[#8D6E63] text-[16px] mb-1">
+        Course: {course?.title || `Course ID: ${exam.courseId.toString()}`}
+      </p>
+      <p className="text-[#8D6E63] text-[16px] mb-1">
+        Tutor: {course?.tutorName || "Unknown Tutor"}
+      </p>
+      <p className="text-[#8D6E63] text-[16px] mb-3">
+        Wallet: {exam.creator.slice(0, 6)}...{exam.creator.slice(-4)}
+      </p>
+      <div className="inline-block px-3 py-1 rounded-full text-[16px] bg-[#F5F5DC] border-2 border-[#8D6E63] text-[#5D4037] font-medium">
+        Created by You
+      </div>
+    </motion.div>
+  );
+}
+
+// Remove the custom useGetCourse hook since you're importing it from useContractHooks
+// The useGetCourse hook is already defined in your hooks file
+
 export default function ExamsPage() {
   const { address } = useAccount();
   const { data: userData } = useUsers(address);
   const { examIds, enrolledCourses, isLoading } = useGetAvailableExamsForStudent(address);
   const { data: tutorCourses } = useGetTutorCourses(address);
   const { takeExam, isPending: submittingExam } = useTakeExam();
-  const { createExam, isPending: creatingExam } = useCreateExam();
-  
+
   const [selectedExam, setSelectedExam] = useState<Exam | null>(null);
   const [examQuestions, setExamQuestions] = useState<ExamQuestion[]>([]);
   const [answers, setAnswers] = useState<number[]>([]);
   const [drawerVisible, setDrawerVisible] = useState(false);
   const [takeExamDrawerVisible, setTakeExamDrawerVisible] = useState(false);
-  const [createExamDrawerVisible, setCreateExamDrawerVisible] = useState(false);
-  
-  // New exam form state
-  const [newExamTitle, setNewExamTitle] = useState("");
-  const [selectedCourseId, setSelectedCourseId] = useState<bigint | null>(null);
-  const [questions, setQuestions] = useState<{
-    text: string;
-    options: [string, string, string, string];
-    correctAnswer: number;
-  }[]>([]);
 
   const isTutor = userData?.role === UserRole.TUTOR;
-  
+
   // Create set of enrolled course IDs for quick lookup
   const enrolledCourseIds = new Set(
     enrolledCourses?.map(course => course.courseId) || []
@@ -172,112 +225,88 @@ export default function ExamsPage() {
     }
   };
 
-  const handleCreateExam = () => {
-    if (!newExamTitle.trim() || !selectedCourseId || questions.length === 0) {
-      toast.error("Please fill all fields and add at least one question");
-      return;
-    }
-
-    const questionTexts = questions.map(q => q.text);
-    const questionOptions = questions.map(q => q.options);
-    const correctAnswers = questions.map(q => BigInt(q.correctAnswer));
-
-    createExam(selectedCourseId, newExamTitle, questionTexts, questionOptions, correctAnswers);
-    toast.success("Creating exam...");
-    setCreateExamDrawerVisible(false);
-    resetCreateExamForm();
-  };
-
-  const resetCreateExamForm = () => {
-    setNewExamTitle("");
-    setSelectedCourseId(null);
-    setQuestions([]);
-  };
-
-  const addQuestion = () => {
-    setQuestions([
-      ...questions,
-      {
-        text: "",
-        options: ["", "", "", ""],
-        correctAnswer: 0
-      }
-    ]);
-  };
-
-  const updateQuestion = (index: number, field: string, value: any) => {
-    const newQuestions = [...questions];
-    if (field === "text") {
-      newQuestions[index].text = value;
-    } else if (field.startsWith("option")) {
-      const optionIndex = parseInt(field.replace("option", ""));
-      newQuestions[index].options[optionIndex] = value;
-    } else if (field === "correctAnswer") {
-      newQuestions[index].correctAnswer = value;
-    }
-    setQuestions(newQuestions);
-  };
-
-  const removeQuestion = (index: number) => {
-    setQuestions(questions.filter((_, i) => i !== index));
-  };
-
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-[#5D4037] flex items-center justify-center">
+      <div className="min-h-screen bg-[#8B4513] flex items-center justify-center">
         <div className="text-[#F5F5DC] text-xl">Loading exams...</div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#5D4037] p-8">
+    <div className="min-h-screen bg-[#8B4513] p-8">
       <div className="max-w-6xl mx-auto">
         {/* Header */}
         <div className="flex justify-between items-center mb-8">
-          <h1 className="text-3xl font-bold text-[#F5F5DC]">
-            {isTutor ? "Exam Management" : "Available Exams"}
-          </h1>
-          {isTutor && (
+          <div className="flex flex-col gap-4">
             <motion.button
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
-              onClick={() => setCreateExamDrawerVisible(true)}
-              className="px-6 py-3 bg-[#8D6E63] text-[#F5F5DC] rounded-lg hover:bg-[#A1887F] transition-colors"
+              onClick={() => window.history.back()}
+              className=" cursor-pointer py-2 text-[#F5F5DC] rounded-lg transition-colors flex items-center gap-2"
             >
-              Create New Exam
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+              </svg>
+              Back to Courses
             </motion.button>
-          )}
+            <h1 className="text-3xl font-bold text-[#F5F5DC]">
+              {isTutor ? "My Created Exams" : "Available Exams"}
+            </h1>
+          </div>
         </div>
 
         {/* Exams Grid */}
-        {!isTutor && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {examIds.map((examId, index) => (
-              <ExamCard
-                key={examId.toString()}
-                examId={examId}
-                index={index}
-                enrolledCourseIds={enrolledCourseIds}
-                studentAddress={address}
-                onClick={handleExamClick}
-              />
-            ))}
-          </div>
-        )}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {!isTutor && examIds.map((examId, index) => (
+            <StudentExamCard
+              key={examId.toString()}
+              examId={examId}
+              index={index}
+              enrolledCourseIds={enrolledCourseIds}
+              studentAddress={address}
+              onClick={handleExamClick}
+            />
+          ))}
 
+          {isTutor && examIds.map((examId, index) => (
+            <TutorExamCard
+              key={examId.toString()}
+              examId={examId}
+              index={index}
+              tutorAddress={address}
+            />
+          ))}
+        </div>
+
+        {/* Empty States */}
         {!isTutor && examIds.length === 0 && (
           <div className="text-center py-16 bg-[#F5F5DC] rounded-xl border-2 border-[#8D6E63]">
             <p className="text-[#5D4037] text-xl">No exams available</p>
             <p className="text-[#6D4C41] mt-2">Enroll in courses to see available exams</p>
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => window.history.back()}
+              className="mt-4 px-6 py-2 bg-[#8B4513] text-[#F5F5DC] rounded-lg hover:bg-[#6D4C41] transition-colors"
+            >
+              Back to Courses
+            </motion.button>
           </div>
         )}
 
-        {isTutor && (
+        {isTutor && examIds.length === 0 && (
           <div className="text-center py-16 bg-[#F5F5DC] rounded-xl border-2 border-[#8D6E63]">
-            <p className="text-[#5D4037] text-xl">
-              Use "Create New Exam" to create exams for your courses
-            </p>
+            <p className="text-[#5D4037] text-xl">No exams created yet</p>
+            <p className="text-[#6D4C41] mt-2">Create exams from your course management page</p>
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => window.history.back()}
+              className="mt-4 px-6 py-2 bg-[#8B4513] text-[#F5F5DC] rounded-lg hover:bg-[#6D4C41] transition-colors"
+            >
+              Back to Courses
+            </motion.button>
           </div>
         )}
 
@@ -296,23 +325,23 @@ export default function ExamsPage() {
                 <p className="text-[#6D4C41]">
                   Questions: {selectedExam.questionCount.toString()}
                 </p>
-                <p className="text-sm text-[#8D6E63]">
+                <p className="text-[#8D6E63] text-[20px]">
                   Exam ID: {selectedExam.examId.toString()}
                 </p>
-                <p className="text-sm text-[#8D6E63]">
+                <p className="text-[#8D6E63] text-[20px]">
                   Course ID: {selectedExam.courseId.toString()}
                 </p>
               </div>
-              
+
               <div className="flex gap-2">
                 <Button
                   type="primary"
                   onClick={handleTakeExam}
-                  className="w-full bg-[#5D4037] hover:bg-[#6D4C41]"
+                  className="w-full bg-[#8B4513] hover:bg-[#6D4C41]"
                 >
                   Take Exam
                 </Button>
-                <Button 
+                <Button
                   onClick={() => setDrawerVisible(false)}
                   className="w-full"
                 >
@@ -352,131 +381,19 @@ export default function ExamsPage() {
                 </Radio.Group>
               </div>
             ))}
-            
+
             <div className="flex gap-2">
               <Button
                 type="primary"
                 loading={submittingExam}
                 onClick={handleSubmitExam}
-                className="w-full bg-[#5D4037] hover:bg-[#6D4C41]"
+                className="w-full bg-[#8B4513] hover:bg-[#6D4C41]"
                 disabled={answers.some(answer => answer === -1)}
               >
                 Submit Exam
               </Button>
-              <Button 
-                onClick={() => setTakeExamDrawerVisible(false)}
-                className="w-full"
-              >
-                Cancel
-              </Button>
-            </div>
-          </div>
-        </Drawer>
-
-        {/* Create Exam Drawer */}
-        <Drawer
-          title={<span className="text-[#5D4037]">Create New Exam</span>}
-          placement="right"
-          onClose={() => setCreateExamDrawerVisible(false)}
-          open={createExamDrawerVisible}
-          width={600}
-        >
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium mb-2 text-[#5D4037]">Exam Title</label>
-              <input
-                type="text"
-                value={newExamTitle}
-                onChange={(e) => setNewExamTitle(e.target.value)}
-                placeholder="Enter exam title"
-                className="w-full p-2 border-2 border-[#D7CCC8] rounded-md focus:border-[#5D4037] focus:outline-none"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium mb-2 text-[#5D4037]">Select Course</label>
-              <select
-                value={selectedCourseId?.toString() || ""}
-                onChange={(e) => setSelectedCourseId(BigInt(e.target.value))}
-                className="w-full p-2 border-2 border-[#D7CCC8] rounded-md focus:border-[#5D4037] focus:outline-none"
-              >
-                <option value="">Select a course</option>
-                {tutorCourses?.map((course) => (
-                  <option key={course.courseId.toString()} value={course.courseId.toString()}>
-                    {course.title}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="border-t-2 border-[#D7CCC8] pt-4">
-              <div className="flex justify-between items-center mb-4">
-                <h4 className="font-semibold text-[#5D4037]">Questions</h4>
-                <Button 
-                  type="dashed" 
-                  onClick={addQuestion}
-                  className="border-[#8D6E63] text-[#5D4037]"
-                >
-                  Add Question
-                </Button>
-              </div>
-
-              {questions.map((question, index) => (
-                <div key={index} className="border-2 border-[#D7CCC8] p-4 rounded mb-4 bg-[#F5F5DC]">
-                  <div className="flex justify-between items-center mb-2">
-                    <span className="font-medium text-[#5D4037]">Question {index + 1}</span>
-                    <button
-                      onClick={() => removeQuestion(index)}
-                      className="text-red-600 hover:text-red-800 text-sm"
-                    >
-                      Remove
-                    </button>
-                  </div>
-                  
-                  <input
-                    type="text"
-                    placeholder="Question text"
-                    value={question.text}
-                    onChange={(e) => updateQuestion(index, "text", e.target.value)}
-                    className="w-full p-2 border-2 border-[#D7CCC8] rounded-md mb-3 focus:border-[#5D4037] focus:outline-none"
-                  />
-                  
-                  {question.options.map((option, optIndex) => (
-                    <input
-                      key={optIndex}
-                      type="text"
-                      placeholder={`Option ${optIndex + 1}`}
-                      value={option}
-                      onChange={(e) => updateQuestion(index, `option${optIndex}`, e.target.value)}
-                      className="w-full p-2 border-2 border-[#D7CCC8] rounded-md mb-2 focus:border-[#5D4037] focus:outline-none"
-                    />
-                  ))}
-                  
-                  <select
-                    value={question.correctAnswer}
-                    onChange={(e) => updateQuestion(index, "correctAnswer", parseInt(e.target.value))}
-                    className="w-full p-2 border-2 border-[#D7CCC8] rounded-md focus:border-[#5D4037] focus:outline-none"
-                  >
-                    <option value={0}>Correct Answer: Option 1</option>
-                    <option value={1}>Correct Answer: Option 2</option>
-                    <option value={2}>Correct Answer: Option 3</option>
-                    <option value={3}>Correct Answer: Option 4</option>
-                  </select>
-                </div>
-              ))}
-            </div>
-
-            <div className="flex gap-2">
               <Button
-                type="primary"
-                loading={creatingExam}
-                onClick={handleCreateExam}
-                className="w-full bg-[#5D4037] hover:bg-[#6D4C41]"
-              >
-                Create Exam
-              </Button>
-              <Button 
-                onClick={() => setCreateExamDrawerVisible(false)}
+                onClick={() => setTakeExamDrawerVisible(false)}
                 className="w-full"
               >
                 Cancel

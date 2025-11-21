@@ -62,7 +62,7 @@ export default function Registration({ onRegistrationComplete }: RegistrationCom
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.85, y: 25 }}
           transition={{ duration: 0.55, ease: [0.25, 0.1, 0.25, 1] }}
-          className="flex flex-col items-center w-full max-w-lg px-8 py-20 bg-[#5D4037] rounded-lg shadow-lg gap-8 border border-[#F5F5DC]"
+          className="flex flex-col items-center w-full max-w-lg px-8 py-20 bg-[#8B4513] rounded-lg shadow-lg gap-8 border border-[#F5F5DC]"
         >
 
           <h1 className="text-2xl font-bold text-[#F5F5DC]">

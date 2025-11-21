@@ -18,6 +18,8 @@ import {
   useCreateExam
 } from "@/utils/useContractHooks";
 import ExamTemplate from "./ExamTemplate";
+import { PlusCircleOutlined, DeleteOutlined } from "@ant-design/icons";
+
 
 // Separate component for individual course to properly use hooks
 function CourseCard({
@@ -83,7 +85,7 @@ function CourseCard({
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
             onClick={() => onCreateExam(course)}
-            className="w-full py-2 bg-[#8B4513] text-[#F5F5DC] rounded-lg hover:bg-[#A0522D] transition-colors font-medium"
+            className="w-full py-2 cursor-pointer bg-[#8B4513] text-[#F5F5DC] rounded-lg hover:bg-[#A0522D] transition-colors font-medium"
           >
             Create Exam
           </motion.button>
@@ -96,7 +98,7 @@ function CourseCard({
             whileTap={{ scale: 0.98 }}
             onClick={() => onEnroll(course.courseId)}
             disabled={enrolling}
-            className="w-full py-2 bg-[#654321] text-[#F5F5DC] rounded-lg hover:bg-[#8B4513] transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+            className="w-full py-2 bg-[#654321] cursor-pointer text-[#F5F5DC] rounded-lg hover:bg-[#8B4513] transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
           >
             {enrolling ? "Enrolling..." : "Enroll in Course"}
           </motion.button>
@@ -391,7 +393,7 @@ export default function Courses() {
             </div>
 
             <a
-              href="/exam"
+              href="/exams"
               className="text-[16px] text-[#F5F5DC] underline hover:text-[#FFF8DC] transition"
             >
               Go to Exams
@@ -543,13 +545,10 @@ export default function Courses() {
         >
           <div className="space-y-4">
             {/* Template Section */}
-            <ExamTemplate
-              onImport={handleTemplateImport}
-              disabled={creatingExam || confirmingExam}
-            />
+
 
             <div>
-              <label className="block text-sm font-medium mb-2 text-[#8B4513]">
+              <label className="block text-[16px] font-medium mb-2 text-[#8B4513]">
                 Exam Title
               </label>
               <input
@@ -570,13 +569,22 @@ export default function Courses() {
                     {questions.length} question(s) added
                   </p>
                 </div>
-                <button
-                  onClick={addQuestion}
-                  disabled={creatingExam || confirmingExam}
-                  className="px-4 py-2 border-2 border-[#8B4513] text-[#8B4513] rounded-lg hover:bg-[#8B4513] hover:text-[#F5F5DC] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  Add Question
-                </button>
+
+                <div className="flex items-center gap-3">
+                  <ExamTemplate
+                    onImport={handleTemplateImport}
+                    disabled={creatingExam || confirmingExam}
+                  />
+                  <button
+                    onClick={addQuestion}
+                    disabled={creatingExam || confirmingExam}
+                    className="px-4 py-2 cursor-pointer border-2 border-[#8B4513] text-[#8B4513] rounded-lg hover:bg-[#8B4513] hover:text-[#F5F5DC] transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium whitespace-nowrap h-[42px] flex items-center gap-2"
+                  >
+                    <PlusCircleOutlined className="text-[16px]" />
+                    Add Question
+                  </button>
+                </div>
+
               </div>
 
               <div className="max-h-[calc(100vh-400px)] overflow-y-auto pr-2 space-y-4">
@@ -587,9 +595,10 @@ export default function Courses() {
                       <button
                         onClick={() => removeQuestion(index)}
                         disabled={creatingExam || confirmingExam}
-                        className="text-red-600 hover:text-red-800 text-sm disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+                        className="text-red-600 cursor-pointer hover:text-red-800 text-sm disabled:opacity-50 disabled:cursor-not-allowed font-medium flex items-center gap-1"
                       >
-                        Remove
+                        <DeleteOutlined className="text-[18px]" />
+                        
                       </button>
                     </div>
 
@@ -647,7 +656,7 @@ export default function Courses() {
               <button
                 onClick={handleCreateExam}
                 disabled={!newExamTitle.trim() || questions.length === 0 || creatingExam || confirmingExam}
-                className="flex-1 py-3 bg-[#8B4513] text-[#F5F5DC] rounded-lg hover:bg-[#654321] transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-semibold"
+                className="flex-1 py-3 bg-[#8B4513] cursor-pointer text-[#F5F5DC] rounded-lg hover:bg-[#654321] transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-semibold"
               >
                 {creatingExam && "Confirming in Wallet..."}
                 {confirmingExam && "Creating Exam..."}
@@ -660,7 +669,7 @@ export default function Courses() {
                   resetExamForm();
                 }}
                 disabled={creatingExam || confirmingExam}
-                className="flex-1 py-3 border-2 border-[#8B4513] text-[#8B4513] rounded-lg hover:border-[#654321] hover:bg-[#F5F5DC]/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-semibold"
+                className="flex-1 py-3 border-2 border-[#8B4513] cursor-pointer text-[#8B4513] rounded-lg hover:border-[#654321] hover:bg-[#F5F5DC]/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-semibold"
               >
                 Cancel
               </button>

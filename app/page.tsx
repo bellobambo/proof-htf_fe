@@ -29,7 +29,7 @@ export default function Home() {
   // Not connected → Show connect button
   if (!isConnected) {
     return (
-      <div className="flex min-h-screen items-center justify-center">
+      <div className="flex min-h-screen bg-[#8B4513] items-center justify-center">
         <WalletConnect />
       </div>
     );
