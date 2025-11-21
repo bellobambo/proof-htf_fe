@@ -110,7 +110,7 @@ export default function Registration({ onRegistrationComplete }: RegistrationCom
           </motion.button>
 
           <p className="text-sm text-[#F5F5DC] text-center">
-            Your registration will be stored on-chain.
+            All Interactions are stored on-chain.
           </p>
         </motion.main>
       </AnimatePresence>

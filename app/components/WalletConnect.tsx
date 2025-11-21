@@ -16,7 +16,7 @@ export function WalletConnect() {
         return (
             <motion.button
                 onClick={() => disconnect()}
-                className="px-4 py-2 bg-[#8D6E63] text-[#F5F5DC] rounded-lg border border-[#6D4C41] hover:bg-[#6D4C41] transition-colors font-medium text-sm"
+                className="px-4 py-2 bg-[#8D6E63] cursor-pointer text-[#F5F5DC] rounded-lg border border-[#6D4C41] hover:bg-[#6D4C41] transition-colors font-medium text-sm"
                 whileHover={{
                     scale: 1.05,
                     transition: { duration: 0.2 }
