@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Drawer, Button, Radio, Space, Progress, Card } from "antd";
+import { Drawer } from "antd";
 import { useAccount } from "wagmi";
 import { toast } from "react-hot-toast";
 import {
@@ -13,11 +13,9 @@ import {
   useGetExamQuestions,
   UserRole,
   ExamQuestion,
-  useCreateExam,
   useGetExam,
   useExamSessions,
   Exam,
-  Course,
   useGetCourse,
   useGetPastExamForRevision
 } from "@/utils/useContractHooks";
@@ -28,13 +26,15 @@ function StudentExamCard({
   index,
   enrolledCourseIds,
   studentAddress,
-  onClick
+  onClick,
+  onViewPastQuestions
 }: {
   examId: bigint;
   index: number;
   enrolledCourseIds: Set<bigint>;
   studentAddress: `0x${string}` | undefined;
   onClick: (exam: Exam, isCompleted: boolean, score: bigint) => void;
+  onViewPastQuestions: (exam: Exam) => void;
 }) {
   const { data: exam, isLoading } = useGetExam(examId);
   const { data: sessionData } = useExamSessions(examId, studentAddress);
@@ -56,13 +56,11 @@ function StudentExamCard({
     return null;
   }
 
-  // Check if exam belongs to an enrolled course
   const isEnrolled = enrolledCourseIds.has(exam.courseId);
   if (!isEnrolled) {
     return null;
   }
 
-  // Convert session data to ExamSession object
   const isCompleted = sessionData ? sessionData[3] : false;
   const score = sessionData ? sessionData[2] : BigInt(0);
 
@@ -89,7 +87,7 @@ function StudentExamCard({
         }`}>
         {isCompleted ? `Completed - Score: ${score.toString()}` : "Available"}
       </div>
-      {!isCompleted && (
+      {!isCompleted ? (
         <motion.button
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
@@ -101,6 +99,31 @@ function StudentExamCard({
         >
           Take Exam
         </motion.button>
+      ) : (
+        <div className="mt-4 space-y-2">
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            className="w-full py-2 bg-[#5D4037] text-[#F5F5DC] rounded-lg hover:bg-[#4E342E] transition-colors font-semibold"
+            onClick={(e) => {
+              e.stopPropagation();
+              onClick(exam, isCompleted, score);
+            }}
+          >
+            View Details
+          </motion.button>
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            className="w-full py-2 bg-[#8B4513] text-[#F5F5DC] rounded-lg hover:bg-[#6D4C41] transition-colors font-semibold"
+            onClick={(e) => {
+              e.stopPropagation();
+              onViewPastQuestions(exam);
+            }}
+          >
+            View Past Questions
+          </motion.button>
+        </div>
       )}
     </motion.div>
   );
@@ -179,19 +202,18 @@ export default function ExamsPage() {
   const [resultsDrawerVisible, setResultsDrawerVisible] = useState(false);
   const [examScore, setExamScore] = useState<{ score: bigint, total: bigint } | null>(null);
   const [pastExamData, setPastExamData] = useState<any>(null);
+  const [pastExamDrawerVisible, setPastExamDrawerVisible] = useState(false);
+  const [loadingPastExam, setLoadingPastExam] = useState(false);
 
   const isTutor = userData?.role === UserRole.TUTOR;
 
-  // Create set of enrolled course IDs for quick lookup
   const enrolledCourseIds = new Set(
     enrolledCourses?.map(course => course.courseId) || []
   );
 
-  const { data: questionsData } = useGetExamQuestions(
-    selectedExam?.examId
-  );
-
-  const { data: pastExamReview } = useGetPastExamForRevision(
+  const { data: questionsData } = useGetExamQuestions(selectedExam?.examId);
+  
+  const { data: pastExamReview, refetch: refetchPastExam, isError: isPastExamError, error: pastExamError } = useGetPastExamForRevision(
     selectedExam?.examId
   );
 
@@ -210,11 +232,9 @@ export default function ExamsPage() {
   const handleExamClick = (exam: Exam, isCompleted: boolean, score: bigint) => {
     setSelectedExam(exam);
     if (isCompleted) {
-      // Show results if exam is completed
       setExamScore({ score, total: exam.questionCount });
       setResultsDrawerVisible(true);
     } else {
-      // Show exam questions directly when clicking "Take Exam"
       setTakeExamDrawerVisible(true);
     }
   };
@@ -237,15 +257,11 @@ export default function ExamsPage() {
     }
   };
 
-  // Add useEffect to handle transaction confirmation
   useEffect(() => {
     if (isConfirmed && selectedExam) {
-      // Exam was successfully submitted
       setTakeExamDrawerVisible(false);
-      // Note: The actual score comes from the smart contract, but we don't have it immediately
-      // You might want to refetch the exam session data to get the real score
       setExamScore({
-        score: BigInt(0), // Placeholder - you'd get this from the contract
+        score: BigInt(0),
         total: selectedExam.questionCount
       });
       setResultsDrawerVisible(true);
@@ -255,7 +271,6 @@ export default function ExamsPage() {
     }
   }, [isConfirmed, selectedExam]);
 
-  // Also handle errors
   useEffect(() => {
     if (error) {
       toast.error("Failed to submit exam");
@@ -263,12 +278,40 @@ export default function ExamsPage() {
     }
   }, [error]);
 
-  const handleAssessPastQuestions = () => {
-    if (selectedExam && pastExamReview) {
-      setPastExamData(pastExamReview);
-      setResultsDrawerVisible(false);
-      // You can implement a separate drawer for past question assessment
-      toast.success("Loading past questions for assessment...");
+  const handleViewPastQuestions = async (exam: Exam) => {
+    setSelectedExam(exam);
+    setLoadingPastExam(true);
+
+    try {
+      const result = await refetchPastExam();
+
+      console.log("Past exam result:", result);
+
+      if (result.isError) {
+        console.error("Past exam error:", result.error);
+        toast.error("You must complete this exam before viewing past questions.");
+        return;
+      }
+
+      if (result.data) {
+        setPastExamData(result.data);
+        setPastExamDrawerVisible(true);
+        toast.success("Past questions loaded successfully!");
+      } else {
+        toast.error("No past exam data available. Please ensure you've completed this exam.");
+      }
+    } catch (error: any) {
+      console.error("Error accessing past questions:", error);
+      
+      if (error?.message?.includes("Not enrolled in course")) {
+        toast.error("You are not enrolled in this course");
+      } else if (error?.message?.includes("Must complete exam before viewing revision")) {
+        toast.error("You must complete the exam before viewing past questions");
+      } else {
+        toast.error("Failed to load past questions. Please try again.");
+      }
+    } finally {
+      setLoadingPastExam(false);
     }
   };
 
@@ -288,7 +331,6 @@ export default function ExamsPage() {
   return (
     <div className="min-h-screen bg-[#8B4513] p-8">
       <div className="max-w-6xl mx-auto">
-        {/* Header */}
         <div className="flex justify-between items-center mb-8">
           <div className="flex flex-col gap-4">
             <motion.button
@@ -308,7 +350,6 @@ export default function ExamsPage() {
           </div>
         </div>
 
-        {/* Exams Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {!isTutor && examIds.map((examId, index) => (
             <StudentExamCard
@@ -318,6 +359,7 @@ export default function ExamsPage() {
               enrolledCourseIds={enrolledCourseIds}
               studentAddress={address}
               onClick={handleExamClick}
+              onViewPastQuestions={handleViewPastQuestions}
             />
           ))}
 
@@ -331,7 +373,6 @@ export default function ExamsPage() {
           ))}
         </div>
 
-        {/* Empty States */}
         {!isTutor && examIds.length === 0 && (
           <div className="text-center py-16 bg-[#F5F5DC] rounded-xl border-2 border-[#8D6E63]">
             <p className="text-[#5D4037] text-xl">No exams available</p>
@@ -362,7 +403,7 @@ export default function ExamsPage() {
           </div>
         )}
 
-        {/* Take Exam Drawer - Shows questions directly */}
+        {/* Take Exam Drawer */}
         <Drawer
           title={<span className="text-[#5D4037] text-xl font-bold">Taking Exam: {selectedExam?.title}</span>}
           placement="right"
@@ -405,8 +446,8 @@ export default function ExamsPage() {
                           className="hidden"
                         />
                         <div className={`flex items-center justify-center w-8 h-8 rounded-full border-2 mr-4 flex-shrink-0 ${answers[index] === optIndex
-                            ? 'border-[#8B4513] bg-[#8B4513] text-[#F5F5DC]'
-                            : 'border-[#8D6E63] text-[#5D4037] bg-transparent'
+                          ? 'border-[#8B4513] bg-[#8B4513] text-[#F5F5DC]'
+                          : 'border-[#8D6E63] text-[#5D4037] bg-transparent'
                           } font-semibold transition-colors`}>
                           {optionLetter}
                         </div>
@@ -423,8 +464,8 @@ export default function ExamsPage() {
                 onClick={handleSubmitExam}
                 disabled={answers.some(answer => answer === -1) || submittingExam}
                 className={`w-full py-3 px-4 cursor-pointer rounded-lg font-medium transition-colors text-lg ${answers.some(answer => answer === -1) || submittingExam
-                    ? 'bg-gray-400 cursor-not-allowed text-gray-200'
-                    : 'bg-[#8B4513] hover:bg-[#6D4C41] text-[#F5F5DC]'
+                  ? 'bg-gray-400 cursor-not-allowed text-gray-200'
+                  : 'bg-[#8B4513] hover:bg-[#6D4C41] text-[#F5F5DC]'
                   }`}
               >
                 {submittingExam ? (
@@ -449,13 +490,14 @@ export default function ExamsPage() {
           </div>
         </Drawer>
 
-        {/* Exam Results Drawer */}
+        {/* Results Drawer - Simplified without "Assess Past Questions" button */}
         <Drawer
-          title={<span className="text-[#5D4037]">Exam Results: {selectedExam?.title}</span>}
+          title={<span className="text-[#5D4037] text-xl font-bold">Exam Results: {selectedExam?.title}</span>}
           placement="right"
           onClose={() => setResultsDrawerVisible(false)}
           open={resultsDrawerVisible}
-          width={500}
+          closeIcon={<div className="text-[#8B4513] hover:text-[#654321] transition-colors">✕</div>}
+          width={600}
           styles={{
             body: { backgroundColor: '#F5F5DC' },
             header: { backgroundColor: '#F5F5DC' },
@@ -471,17 +513,13 @@ export default function ExamsPage() {
                   <div className="relative w-32 h-32">
                     <svg className="w-full h-full" viewBox="0 0 36 36">
                       <path
-                        d="M18 2.0845
-                      a 15.9155 15.9155 0 0 1 0 31.831
-                      a 15.9155 15.9155 0 0 1 0 -31.831"
+                        d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
                         fill="none"
                         stroke="#E5E7EB"
                         strokeWidth="3"
                       />
                       <path
-                        d="M18 2.0845
-                      a 15.9155 15.9155 0 0 1 0 31.831
-                      a 15.9155 15.9155 0 0 1 0 -31.831"
+                        d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
                         fill="none"
                         stroke="#8B4513"
                         strokeWidth="3"
@@ -500,26 +538,148 @@ export default function ExamsPage() {
                   <p className="text-[#5D4037] text-lg">
                     Score: <strong>{examScore.score.toString()}</strong> out of <strong>{examScore.total.toString()}</strong>
                   </p>
-                  <p className="text-[#6D4C41]">
+                  <p className="text-[#6D4C41] text-lg">
                     Percentage: <strong>{calculatePercentage(examScore.score, examScore.total)}%</strong>
+                  </p>
+                  <p className="text-[#8D6E63]">
+                    Status: <strong>Completed</strong>
                   </p>
                 </div>
 
-                <div className="space-y-3">
-                  <button
-                    onClick={handleAssessPastQuestions}
-                    className="w-full py-3 px-4 bg-[#8B4513] hover:bg-[#6D4C41] text-[#F5F5DC] rounded-lg font-medium transition-colors"
-                  >
-                    Assess Past Questions
-                  </button>
-                  <button
-                    onClick={() => setResultsDrawerVisible(false)}
-                    className="w-full py-3 px-4 bg-gray-300 hover:bg-gray-400 text-gray-700 rounded-lg font-medium transition-colors"
-                  >
-                    Close
-                  </button>
+                <button
+                  onClick={() => setResultsDrawerVisible(false)}
+                  className="w-full py-3 px-4 bg-[#8B4513] hover:bg-[#6D4C41] text-[#F5F5DC] rounded-lg font-medium transition-colors text-lg"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          )}
+        </Drawer>
+
+        {/* Past Exam Review Drawer */}
+        <Drawer
+          title={<span className="text-[#5D4037] text-xl font-bold">Exam Review: {selectedExam?.title}</span>}
+          placement="right"
+          onClose={() => setPastExamDrawerVisible(false)}
+          open={pastExamDrawerVisible}
+          width={1500}
+          closeIcon={<div className="text-[#8B4513] hover:text-[#654321] transition-colors">✕</div>}
+          maskClosable={false}
+          styles={{
+            body: { backgroundColor: '#F5F5DC' },
+            header: { backgroundColor: '#F5F5DC' },
+            content: { backgroundColor: '#F5F5DC' }
+          }}
+        >
+          {pastExamData && (
+            <div className="space-y-6">
+              <div className="bg-[#FFF8E1] border border-[#8D6E63] rounded-lg p-6">
+                <h3 className="text-xl font-bold text-[#5D4037] mb-4">Exam Summary</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="text-center">
+                    <p className="text-[#6D4C41]">Your Score</p>
+                    <p className="text-2xl font-bold text-[#8B4513]">{pastExamData[5]?.toString() || '0'}</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-[#6D4C41]">Maximum Score</p>
+                    <p className="text-2xl font-bold text-[#8B4513]">{pastExamData[6]?.toString() || '0'}</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-[#6D4C41]">Percentage</p>
+                    <p className="text-2xl font-bold text-[#8B4513]">
+                      {pastExamData[5] && pastExamData[6]
+                        ? calculatePercentage(pastExamData[5], pastExamData[6])
+                        : 0}%
+                    </p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-[#6D4C41]">Questions</p>
+                    <p className="text-2xl font-bold text-[#8B4513]">{pastExamData[0]?.length || 0}</p>
+                  </div>
                 </div>
               </div>
+
+              {pastExamData[0]?.map((question: string, index: number) => {
+                const studentAnswer = pastExamData[3]?.[index];
+                const correctAnswer = pastExamData[2]?.[index];
+                const isCorrect = pastExamData[4]?.[index];
+                const options = pastExamData[1]?.[index] || ['', '', '', ''];
+
+                return (
+                  <div
+                    key={index}
+                    className={`border-2 rounded-lg p-6 ${isCorrect
+                      ? 'border-[#4CAF50] bg-[#E8F5E8]'
+                      : 'border-[#F44336] bg-[#FFEBEE]'
+                      }`}
+                  >
+                    <h4 className="font-semibold mb-4 text-[#5D4037] text-lg">
+                      Question {index + 1}: {question}
+                    </h4>
+
+                    <div className="space-y-3 mb-4">
+                      {options.map((option: string, optIndex: number) => {
+                        const optionLetters = ['A', 'B', 'C', 'D'];
+                        const optionLetter = optionLetters[optIndex];
+                        const isStudentAnswer = studentAnswer === BigInt(optIndex);
+                        const isCorrectAnswer = correctAnswer === BigInt(optIndex);
+
+                        return (
+                          <div
+                            key={optIndex}
+                            className={`flex items-center p-3 rounded-lg border-2 ${isCorrectAnswer
+                              ? 'border-[#4CAF50] bg-[#C8E6C9]'
+                              : isStudentAnswer && !isCorrectAnswer
+                                ? 'border-[#F44336] bg-[#FFCDD2]'
+                                : 'border-[#8D6E63] bg-[#FFF8E1]'
+                              }`}
+                          >
+                            <div className={`flex items-center justify-center w-8 h-8 rounded-full border-2 mr-4 flex-shrink-0 ${isCorrectAnswer
+                              ? 'border-[#4CAF50] bg-[#4CAF50] text-white'
+                              : isStudentAnswer && !isCorrectAnswer
+                                ? 'border-[#F44336] bg-[#F44336] text-white'
+                                : 'border-[#8D6E63] text-[#5D4037] bg-transparent'
+                              } font-semibold`}>
+                              {optionLetter}
+                            </div>
+                            <span className="text-[#5D4037] text-base flex-1">{option}</span>
+
+                            {isCorrectAnswer && (
+                              <span className="ml-2 px-2 py-1 bg-[#4CAF50] text-white text-sm rounded-full">
+                                Correct Answer
+                              </span>
+                            )}
+                            {isStudentAnswer && !isCorrectAnswer && (
+                              <span className="ml-2 px-2 py-1 bg-[#F44336] text-white text-sm rounded-full">
+                                Your Answer
+                              </span>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    <div className={`p-3 rounded-lg ${isCorrect ? 'bg-[#4CAF50] text-white' : 'bg-[#F44336] text-white'
+                      }`}>
+                      <p className="font-semibold">
+                        {isCorrect ? '✓ Correct!' : '✗ Incorrect'}
+                      </p>
+                      <p>
+                        Your answer: {String.fromCharCode(65 + Number(studentAnswer || 0))} |
+                        Correct answer: {String.fromCharCode(65 + Number(correctAnswer || 0))}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })}
+
+              <button
+                onClick={() => setPastExamDrawerVisible(false)}
+                className="w-full py-3 px-4 bg-[#8B4513] hover:bg-[#6D4C41] text-[#F5F5DC] rounded-lg font-medium transition-colors text-lg"
+              >
+                Close Review
+              </button>
             </div>
           )}
         </Drawer>

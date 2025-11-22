@@ -89,11 +89,7 @@ export type QuestionOptions = [string, string, string, string];
 // FIXED: Return only the course count, not individual courses
 // Let the component handle fetching individual courses
 export function useGetAllCourses() {
-  const {
-    data: courseCount,
-    error,
-    isLoading,
-  } = useCourseCounter();
+  const { data: courseCount, error, isLoading } = useCourseCounter();
 
   const count = courseCount ? Number(courseCount) : 0;
 
@@ -362,8 +358,9 @@ export function useGetExamResults(
   });
 }
 
+// Add this to your hooks file
 export function useGetPastExamForRevision(examId: bigint | undefined) {
-  return useReadContract({
+  const result = useReadContract({
     address: CONTRACT_ADDRESS,
     abi: CONTRACT_ABI,
     functionName: "getPastExamForRevision",
@@ -372,6 +369,36 @@ export function useGetPastExamForRevision(examId: bigint | undefined) {
       enabled: examId !== undefined,
     },
   });
+
+  // Add proper error handling and data transformation
+  const transformedData = useMemo(() => {
+    if (!result.data) return null;
+
+    const data = result.data as readonly [
+      readonly string[],
+      readonly [string, string, string, string][],
+      readonly bigint[],
+      readonly bigint[],
+      readonly boolean[],
+      bigint,
+      bigint
+    ];
+
+    return {
+      questionTexts: data[0],
+      questionOptions: data[1],
+      correctAnswers: data[2],
+      studentAnswers: data[3],
+      isCorrect: data[4],
+      studentScore: data[5],
+      maxScore: data[6],
+    };
+  }, [result.data]);
+
+  return {
+    ...result,
+    data: transformedData,
+  };
 }
 
 export function useGetTutorCourses(tutorAddress: `0x${string}` | undefined) {
