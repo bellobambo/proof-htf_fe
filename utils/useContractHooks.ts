@@ -4,9 +4,10 @@ import {
   useReadContract,
   useWriteContract,
   useWaitForTransactionReceipt,
+  useAccount,
 } from "wagmi";
 import { CONTRACT_ABI, CONTRACT_ADDRESS } from "./contract";
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 
 // Reuse existing interfaces and enums
 export enum UserRole {
@@ -358,46 +359,64 @@ export function useGetExamResults(
   });
 }
 
-// Add this to your hooks file
 export function useGetPastExamForRevision(examId: bigint | undefined) {
+  const { address } = useAccount();
+  const { data: userData } = useUsers(address);
+
+  const isStudent =
+    userData?.role === UserRole.STUDENT && userData?.isRegistered;
+
   const result = useReadContract({
     address: CONTRACT_ADDRESS,
     abi: CONTRACT_ABI,
     functionName: "getPastExamForRevision",
     args: examId !== undefined ? [examId] : undefined,
     query: {
-      enabled: examId !== undefined,
+      enabled: examId !== undefined && isStudent && !!address,
     },
   });
 
-  // Add proper error handling and data transformation
+  // Add debug logging
+  useEffect(() => {
+    if (examId && address) {
+      console.group("🎯 useGetPastExamForRevision Debug");
+      console.log("Address:", address);
+      console.log("Exam ID:", examId.toString());
+      console.log("User Data:", userData);
+      console.log("Is Student:", isStudent);
+      console.log(
+        "Hook Enabled:",
+        examId !== undefined && isStudent && !!address
+      );
+      console.groupEnd();
+    }
+  }, [examId, address, userData, isStudent]);
+
+  // Transform the data
   const transformedData = useMemo(() => {
     if (!result.data) return null;
 
     const data = result.data as readonly [
-      readonly string[],
-      readonly [string, string, string, string][],
-      readonly bigint[],
-      readonly bigint[],
-      readonly boolean[],
-      bigint,
-      bigint
+      readonly string[], // questionTexts
+      readonly [string, string, string, string][] // questionOptions
     ];
+
+    console.log("📦 Past Exam Data Received:", {
+      questionCount: data[0].length,
+      optionsCount: data[1].length,
+    });
 
     return {
       questionTexts: data[0],
       questionOptions: data[1],
-      correctAnswers: data[2],
-      studentAnswers: data[3],
-      isCorrect: data[4],
-      studentScore: data[5],
-      maxScore: data[6],
     };
   }, [result.data]);
 
   return {
     ...result,
     data: transformedData,
+    isStudent,
+    userData,
   };
 }
 

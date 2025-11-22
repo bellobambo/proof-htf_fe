@@ -15,7 +15,8 @@ import {
   Course,
   useCreateCourse,
   useGetCourse,
-  useCreateExam
+  useCreateExam,
+  useCourseEnrollments // Add this import
 } from "@/utils/useContractHooks";
 import ExamTemplate from "./ExamTemplate";
 import { PlusCircleOutlined, DeleteOutlined } from "@ant-design/icons";
@@ -40,6 +41,7 @@ function CourseCard({
   userAddress: `0x${string}` | undefined;
 }) {
   const { data: course, isLoading } = useGetCourse(courseId);
+  const { data: isEnrolled } = useCourseEnrollments(courseId, userAddress); // Check enrollment status
 
   if (isLoading) {
     return (
@@ -73,8 +75,17 @@ function CourseCard({
         {`${course.tutor.slice(0, 6)}...${course.tutor.slice(-4)}`}
       </p>
 
-      <div className="inline-block px-3 py-1 rounded-full text-sm mb-4 bg-[#FAF0E6] border border-[#8B4513] text-[#8B4513] font-medium">
-        Active
+      <div className="flex items-center gap-2 mb-4">
+        <div className="inline-block px-3 py-1 rounded-full text-sm bg-[#FAF0E6] border border-[#8B4513] text-[#8B4513] font-medium">
+          Active
+        </div>
+        
+        {/* Enrollment status badge for students */}
+        {!isTutor && isEnrolled && (
+          <div className="inline-block px-3 py-1 rounded-full text-sm bg-green-100 border border-green-600 text-green-700 font-medium">
+            Enrolled
+          </div>
+        )}
       </div>
 
       {/* Buttons container */}
@@ -94,13 +105,17 @@ function CourseCard({
         {/* Enroll button for students */}
         {!isTutor && (
           <motion.button
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
+            whileHover={!isEnrolled ? { scale: 1.02 } : {}}
+            whileTap={!isEnrolled ? { scale: 0.98 } : {}}
             onClick={() => onEnroll(course.courseId)}
-            disabled={enrolling}
-            className="w-full py-2 bg-[#654321] cursor-pointer text-[#F5F5DC] rounded-lg hover:bg-[#8B4513] transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+            disabled={enrolling || isEnrolled} // Disable if already enrolled or enrolling
+            className={`w-full py-2 cursor-pointer text-[#F5F5DC] rounded-lg transition-colors font-medium ${
+              isEnrolled 
+                ? "bg-gray-400 cursor-not-allowed" 
+                : "bg-[#654321] hover:bg-[#8B4513] disabled:opacity-50 disabled:cursor-not-allowed"
+            }`}
           >
-            {enrolling ? "Enrolling..." : "Enroll in Course"}
+            {enrolling ? "Enrolling..." : isEnrolled ? "Already Enrolled" : "Enroll in Course"}
           </motion.button>
         )}
       </div>
@@ -108,6 +123,7 @@ function CourseCard({
   );
 }
 
+// The rest of your component remains the same...
 export default function Courses() {
   const { address } = useAccount();
   const { data: userData } = useUsers(address);
@@ -251,94 +267,19 @@ export default function Courses() {
   };
 
   // Function to handle template import
-  const handleTemplateImport = (file: File) => {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      try {
-        const content = e.target?.result as string;
-        const lines = content.split('\n').map(line => line.trim()).filter(line => line);
-
-        let examTitle = "";
-        const importedQuestions: { text: string; options: [string, string, string, string]; correctAnswer: number }[] = [];
-
-        let currentQuestion: any = null;
-
-        for (let i = 0; i < lines.length; i++) {
-          const line = lines[i];
-
-          // Extract exam title
-          if (line.startsWith('EXAM TITLE:')) {
-            examTitle = line.replace('EXAM TITLE:', '').trim().replace(/^\[.*\]$/, '').trim();
-            continue;
-          }
-
-          // Skip instructions and example sections
-          if (line === 'INSTRUCTIONS:' || line === 'EXAMPLE:' || line === 'EXAM TEMPLATE' || line.includes('===')) {
-            continue;
-          }
-
-          // Detect question number (e.g., "1.", "2.")
-          const questionMatch = line.match(/^(\d+)\.\s*(.+[?])$/);
-          if (questionMatch) {
-            // Save previous question if exists
-            if (currentQuestion && currentQuestion.text && currentQuestion.options.every((opt: string) => opt.trim())) {
-              importedQuestions.push(currentQuestion);
-            }
-
-            currentQuestion = {
-              text: questionMatch[2].trim(),
-              options: ['', '', '', ''],
-              correctAnswer: 0
-            };
-            continue;
-          }
-
-          // Detect options (a), b), c), d)
-          const optionMatch = line.match(/^([a-d])\)\s*(.+)$/);
-          if (optionMatch && currentQuestion) {
-            const optLetter = optionMatch[1];
-            const optText = optionMatch[2].trim();
-            const optIndex = ['a', 'b', 'c', 'd'].indexOf(optLetter);
-
-            if (optIndex >= 0 && optIndex < 4) {
-              currentQuestion.options[optIndex] = optText;
-            }
-            continue;
-          }
-
-          // Detect correct answer (a, b, c, d)
-          const answerMatch = line.match(/Correct Answer:\s*([a-d])/i);
-          if (answerMatch && currentQuestion) {
-            const answerLetter = answerMatch[1].toLowerCase();
-            currentQuestion.correctAnswer = ['a', 'b', 'c', 'd'].indexOf(answerLetter);
-            continue;
-          }
-
-          // If we're in a question block and line doesn't match patterns, it might be continuation of question text
-          if (currentQuestion && !line.match(/^[a-d]\)/) && !line.match(/Correct Answer:/i) &&
-            !line.match(/^\d+\./) && line !== '' && !currentQuestion.text.endsWith('?')) {
-            currentQuestion.text += ' ' + line;
-          }
-        }
-
-        // Add the last question
-        if (currentQuestion && currentQuestion.text && currentQuestion.options.every((opt: string) => opt.trim())) {
-          importedQuestions.push(currentQuestion);
-        }
-
-        if (examTitle) {
-          setNewExamTitle(examTitle);
-        }
-
-        if (importedQuestions.length > 0) {
-          setQuestions(importedQuestions);
-        }
-      } catch (error) {
-        console.error('Error parsing template:', error);
-        toast.error("Error parsing template file. Please make sure it follows the correct format.");
+  const handleTemplateImport = (file: File, examTitle: string, importedQuestions: any[]) => {
+    try {
+      if (examTitle) {
+        setNewExamTitle(examTitle);
       }
-    };
-    reader.readAsText(file);
+
+      if (importedQuestions.length > 0) {
+        setQuestions(importedQuestions);
+      }
+    } catch (error) {
+      console.error('Error processing template:', error);
+      toast.error("Error processing template file. Please make sure it follows the correct format.");
+    }
   };
 
   if (isLoading) {
@@ -375,7 +316,7 @@ export default function Courses() {
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
               onClick={() => setCreateModalVisible(true)}
-              className="px-6 py-3 bg-[#A0522D] cursor-pointer text-[#F5F5DC] rounded-lg hover:bg-[#8B4513] transition-colors font-medium"
+              className="px-6 py-3 bg-[#A0522D] border border-[#D2B48C] cursor-pointer text-[#F5F5DC] rounded-lg hover:bg-[#8B4513] transition-colors font-medium"
             >
               Create New Course
             </motion.button>
@@ -416,20 +357,11 @@ export default function Courses() {
           </div>
 
           {courseIds.length === 0 && (
-            <div className="text-center py-16 bg-[#F5F5DC] rounded-xl border-2 border-[#8B4513]">
-              <p className="text-[#8B4513] text-xl mb-4">
+            <div className="text-center py-16">
+              <p className="text-[#F5F5DC] text-xl mb-4">
                 {isTutor ? "No courses created yet" : "No courses available"}
               </p>
-              {isTutor && (
-                <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={() => setCreateModalVisible(true)}
-                  className="px-6 py-3 cursor-pointer bg-[#654321] text-[#F5F5DC] rounded-lg hover:bg-[#8B4513] transition-colors font-medium"
-                >
-                  Create Your First Course
-                </motion.button>
-              )}
+
             </div>
           )}
         </div>
@@ -472,7 +404,7 @@ export default function Courses() {
                   {/* Form */}
                   <div className="space-y-6 p-4">
                     <div>
-                      <label className="block text-sm font-medium mb-3 text-[#8B4513]">
+                      <label className="block text-[16px] font-medium mb-3 text-[#8B4513]">
                         Course Title
                       </label>
                       <input
@@ -543,38 +475,44 @@ export default function Courses() {
             content: { backgroundColor: '#F5F5DC' }
           }}
         >
-          <div className="space-y-4">
+          <div className="space-y-2">
             {/* Template Section */}
 
 
-            <div>
-              <label className="block text-[16px] font-medium mb-2 text-[#8B4513]">
+            <div className="flex justify-between items-center mb-2">
+              <label className="block text-[20px] font-medium text-[#8B4513]">
                 Exam Title
               </label>
-              <input
-                type="text"
-                value={newExamTitle}
-                onChange={(e) => setNewExamTitle(e.target.value)}
-                placeholder="Enter exam title"
-                disabled={creatingExam || confirmingExam}
-                className="w-full p-3 border-2 border-[#D2B48C] text-[#8B4513] rounded-lg focus:border-[#8B4513] focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed bg-white"
-              />
+
+              <div className="ml-4">
+                <ExamTemplate
+                  onImport={(file, examTitle, questions) => handleTemplateImport(file, examTitle, questions)}
+                  disabled={creatingExam || confirmingExam}
+                />
+              </div>
             </div>
 
-            <div className="border-t-2 border-[#D2B48C] pt-4">
+            <input
+              type="text"
+              value={newExamTitle}
+              onChange={(e) => setNewExamTitle(e.target.value)}
+              placeholder="Enter exam title"
+              disabled={creatingExam || confirmingExam}
+              className="w-full p-3 border-2 border-[#D2B48C] text-[#8B4513] rounded-lg focus:border-[#8B4513] focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed bg-white"
+            />
+
+
+            <div className="border-t-2 border-[#D2B48C] pt-8">
               <div className="flex justify-between items-center mb-4">
                 <div>
-                  <h4 className="font-semibold text-[#8B4513]">Questions</h4>
+                  <h4 className="font-semibold text-[#8B4513] text-[16px]">Questions</h4>
                   <p className="text-sm text-[#A0522D]">
                     {questions.length} question(s) added
                   </p>
                 </div>
 
                 <div className="flex items-center gap-3">
-                  <ExamTemplate
-                    onImport={handleTemplateImport}
-                    disabled={creatingExam || confirmingExam}
-                  />
+
                   <button
                     onClick={addQuestion}
                     disabled={creatingExam || confirmingExam}
@@ -598,7 +536,7 @@ export default function Courses() {
                         className="text-red-600 cursor-pointer hover:text-red-800 text-sm disabled:opacity-50 disabled:cursor-not-allowed font-medium flex items-center gap-1"
                       >
                         <DeleteOutlined className="text-[18px]" />
-                        
+
                       </button>
                     </div>
 
@@ -647,7 +585,7 @@ export default function Courses() {
               {questions.length === 0 && (
                 <div className="text-center py-8 text-[#A0522D] bg-[#FAF0E6] rounded-lg border-2 border-dashed border-[#8B4513]">
                   <p className="mb-2">No questions added yet.</p>
-                  <p className="text-sm">Click "Add Question" to start or upload a template file.</p>
+                  <p className="text-sm">Click "Add Question" to start or upload a question file.</p>
                 </div>
               )}
             </div>

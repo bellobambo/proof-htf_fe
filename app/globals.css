@@ -2,14 +2,14 @@
 
 /* Calm Brown Theme */
 :root {
-  --background: #4E342E;  /* Deep Chocolate Brown */
+  --background: #8B4513;  /* Deep Chocolate Brown */
   --foreground: #F5F5DC;  /* Creamish Yellow (formerly Warm White) */
   --accent: #8D6E63;      /* Medium Brown */
   --secondary: #5D4037;   /* Muted Brown */
 }
 
 body {
-  background: #4E342E;
+  background: #8B4513;
   color: #F5F5DC;
   font-family: var(--font-titillium), system-ui, sans-serif;
 }

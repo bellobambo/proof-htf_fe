@@ -54,7 +54,7 @@ export default function Registration({ onRegistrationComplete }: RegistrationCom
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center font-sans">
+    <div className="flex min-h-screen items-center bg-[#8B4513] justify-center font-sans">
       <AnimatePresence>
         <motion.main
           key="register-modal"
@@ -100,7 +100,7 @@ export default function Registration({ onRegistrationComplete }: RegistrationCom
             whileTap={{ scale: 0.97 }}
             onClick={handleRegister}
             disabled={isPending || isConfirming}
-            className="w-full py-3 rounded-md bg-[#8D6E63] text-[#F5F5DC] hover:bg-[#A1887F] hover:text-[#4E342E] transition disabled:opacity-40 font-semibold cursor-pointer"
+            className="w-full py-3 rounded-md bg-[#8B4513] border border-[#F5F5DC] text-[#F5F5DC] hover:bg-[#F5F5DC] hover:border-[#8B4513] hover:text-[#8B4513] transition-all duration-300 disabled:opacity-40 font-semibold cursor-pointer"
           >
             {isPending
               ? "Confirm in Wallet..."

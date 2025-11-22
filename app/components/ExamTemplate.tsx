@@ -3,9 +3,8 @@
 import { toast } from "react-hot-toast";
 import { DownloadOutlined } from "@ant-design/icons";
 
-
 interface ExamTemplateProps {
-  onImport: (file: File) => void;
+  onImport: (file: File, examTitle: string, questions: any[]) => void;
   disabled?: boolean;
 }
 
@@ -46,24 +45,24 @@ INSTRUCTIONS:
 
 EXAMPLE:
 --------
-EXAM TITLE: Basic Blockchain Knowledge
+EXAM TITLE: Principles of Economics
 
 QUESTIONS:
 -----------
 
-1. What is the capital of France?
-   a) London
-   b) Berlin
-   c) Paris
-   d) Madrid
-   Correct Answer: c
+1. What is the fundamental problem of economics?
+   a) Unlimited resources and limited wants
+   b) Limited resources and unlimited wants
+   c) Unlimited wants and unlimited resources
+   d) Limited wants and limited resources
+   Correct Answer: b
 
-2. Which language is used for Ethereum smart contracts?
-   a) JavaScript
-   b) Python
-   c) Solidity
-   d) Java
-   Correct Answer: c
+2. Which of the following best describes opportunity cost?
+   a) The money spent on buying a product
+   b) The next best alternative forgone
+   c) The cost of production
+   d) The total revenue earned
+   Correct Answer: b
 `;
 
   const blob = new Blob([templateContent], { type: "text/plain" });
@@ -81,32 +80,32 @@ QUESTIONS:
 // Function to parse uploaded TXT file
 const parseTemplateFile = (content: string) => {
   const lines = content.split('\n').map(line => line.trim()).filter(line => line);
-
+  
   let examTitle = "";
   const questions: { text: string; options: [string, string, string, string]; correctAnswer: number }[] = [];
-
+  
   let currentQuestion: any = null;
-  let optionIndex = 0;
+  let collectingOptions = false;
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
 
-    // Extract exam title
-    if (line.startsWith('EXAM TITLE:')) {
-      examTitle = line.replace('EXAM TITLE:', '').trim().replace(/^\[.*\]$/, '').trim();
+    // Skip header lines and separators
+    if (line === 'EXAM TEMPLATE' || line.includes('===') || line === 'QUESTIONS:' || line === '-----------') {
       continue;
     }
 
-    // Skip instructions and example sections
-    if (line === 'INSTRUCTIONS:' || line === 'EXAMPLE:' || line === 'EXAM TEMPLATE' || line.includes('===')) {
+    // Extract exam title
+    if (line.startsWith('EXAM TITLE:')) {
+      examTitle = line.replace('EXAM TITLE:', '').trim();
       continue;
     }
 
     // Detect question number (e.g., "1.", "2.")
-    const questionMatch = line.match(/^(\d+)\.\s*(.+[?])$/);
+    const questionMatch = line.match(/^(\d+)\.\s*(.+)$/);
     if (questionMatch) {
       // Save previous question if exists
-      if (currentQuestion && currentQuestion.text && currentQuestion.options.every((opt: string) => opt.trim())) {
+      if (currentQuestion) {
         questions.push(currentQuestion);
       }
 
@@ -115,7 +114,7 @@ const parseTemplateFile = (content: string) => {
         options: ['', '', '', ''],
         correctAnswer: 0
       };
-      optionIndex = 0;
+      collectingOptions = false;
       continue;
     }
 
@@ -128,28 +127,31 @@ const parseTemplateFile = (content: string) => {
 
       if (optIndex >= 0 && optIndex < 4) {
         currentQuestion.options[optIndex] = optText;
-        optionIndex++;
       }
+      collectingOptions = true;
       continue;
     }
 
-    // Detect correct answer (a, b, c, d)
+    // Detect correct answer
     const answerMatch = line.match(/Correct Answer:\s*([a-d])/i);
     if (answerMatch && currentQuestion) {
       const answerLetter = answerMatch[1].toLowerCase();
       currentQuestion.correctAnswer = ['a', 'b', 'c', 'd'].indexOf(answerLetter);
+      collectingOptions = false;
       continue;
     }
 
-    // If we're in a question block and line doesn't match patterns, it might be continuation of question text
-    if (currentQuestion && !line.match(/^[a-d]\)/) && !line.match(/Correct Answer:/i) &&
-      !line.match(/^\d+\./) && line !== '' && !currentQuestion.text.endsWith('?')) {
+    // Handle multi-line question text (if the question continues on next line)
+    if (currentQuestion && !collectingOptions && !optionMatch && !answerMatch && 
+        !questionMatch && line !== '' && !line.startsWith('Correct Answer:')) {
+      // If we're not collecting options and this line doesn't match any pattern,
+      // it might be a continuation of the question text
       currentQuestion.text += ' ' + line;
     }
   }
 
-  // Add the last question
-  if (currentQuestion && currentQuestion.text && currentQuestion.options.every((opt: string) => opt.trim())) {
+  // Add the last question if it exists
+  if (currentQuestion) {
     questions.push(currentQuestion);
   }
 
@@ -157,7 +159,10 @@ const parseTemplateFile = (content: string) => {
 };
 
 export default function ExamTemplate({ onImport, disabled = false }: ExamTemplateProps) {
-  const handleFileUpload = (file: File) => {
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
     const reader = new FileReader();
     reader.onload = (e) => {
       try {
@@ -165,7 +170,7 @@ export default function ExamTemplate({ onImport, disabled = false }: ExamTemplat
         const { examTitle, questions } = parseTemplateFile(content);
 
         if (questions.length > 0) {
-          onImport(file);
+          onImport(file, examTitle, questions);
           toast.success(`Successfully imported ${questions.length} questions from template!`);
         } else {
           toast.error("No valid questions found in the template. Please check the format.");
@@ -179,7 +184,7 @@ export default function ExamTemplate({ onImport, disabled = false }: ExamTemplat
   };
 
   return (
-    <div className="rounded-lg border-2 p-4 ">
+    <div className="rounded-lg border-2 p-4">
       <div className="flex items-center gap-2">
         <button
           onClick={downloadTemplate}
@@ -193,13 +198,7 @@ export default function ExamTemplate({ onImport, disabled = false }: ExamTemplat
           <input
             type="file"
             accept=".txt"
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file) {
-                handleFileUpload(file);
-              }
-              e.target.value = '';
-            }}
+            onChange={handleFileUpload}
             disabled={disabled}
             className="hidden"
           />
