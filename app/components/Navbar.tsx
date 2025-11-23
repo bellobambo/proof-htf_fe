@@ -3,6 +3,7 @@
 import { useAccount, useBalance } from "wagmi";
 import { useUsers } from "@/utils/useContractHooks";
 import { WalletConnect } from "./WalletConnect";
+import TranslationModal from "./TranslationModal";
 
 export default function Navbar() {
     const { address, isConnected } = useAccount();
@@ -38,14 +39,13 @@ export default function Navbar() {
 
     return (
         <nav className="bg-[#F5F5DC] border-b border-[#8D6E63] shadow-sm">
-            <div className="px-12  ">
+            <div className="px-12">
                 <div className="flex justify-between items-center h-16">
                     {/* Left side - Logo/Brand */}
                     <div className="flex items-center space-x-4">
                         <div className="flex-shrink-0">
                             <h1 className="text-2xl font-bold text-[#4E342E]">Proof</h1>
-
-                            <p className="text-md  text-[#8D6E63] capitalize">
+                            <p className="text-md text-[#8D6E63] capitalize">
                                 {getUserName()}  {" "}  {getUserRole()}
                             </p>
                         </div>
@@ -54,9 +54,14 @@ export default function Navbar() {
                     {/* Right side - Wallet info */}
                     <div className="flex items-center space-x-4">
                         {!isConnected ? (
-                            <WalletConnect />
+                            <div className="flex items-center space-x-4">
+                                <TranslationModal />
+                                <WalletConnect />
+                            </div>
                         ) : (
                             <div className="flex items-center space-x-4">
+                                {/* Translation Modal */}
+                                <TranslationModal />
 
                                 {/* Balance */}
                                 {balance && (
@@ -68,24 +73,25 @@ export default function Navbar() {
                                 )}
 
                                 {/* Wallet Address */}
-                                <div className="flex items-center h-10 px-3 rounded border border-[#8D6E63] ">
+                                <div className="flex items-center h-10 px-3 rounded border border-[#8D6E63]">
                                     <p className="text-sm font-mono text-[#4E342E]">
                                         {shortenAddress(address!)}
                                     </p>
                                 </div>
 
-
-
                                 {/* Disconnect */}
-                                <div className="flex items-center  px-3 rounded border ">
+                                <div className="flex items-center px-3 rounded border">
                                     <WalletConnect />
                                 </div>
-
                             </div>
                         )}
                     </div>
-
                 </div>
+                
+                {/* Remove the LocaleSwitcher section since we're using TranslationModal instead */}
+                {/* <div className="bg-black">
+                    <LocaleSwitcher locales={["en", "es"]} />
+                </div> */}
             </div>
         </nav>
     );
