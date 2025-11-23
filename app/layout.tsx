@@ -31,11 +31,6 @@ export default function RootLayout({
 
       <html lang="en">
         <body className={`${titillium.variable} antialiased`}>
-          <div className="absolute top-2 right-3 bg-black">
-            <LocaleSwitcher
-              locales={["en", "es", "zh", "ja", "fr", "de", "ru", "ar", "ko"]}
-            />
-          </div>
           <Toaster
             position="bottom-right"
             toastOptions={{

@@ -1,16 +1,16 @@
-// next.config.mjs
-import type { NextConfig } from "next";
 import lingoCompiler from "lingo.dev/compiler";
 
-const nextConfig: NextConfig = {
+const nextConfig = {
   turbopack: {},
 };
 
 export default lingoCompiler.next({
-  sourceLocale: "fr",
-  targetLocales: ["es", "ja", "fr", "ru", "de", "zh", "ar", "ko"],
-  models: "lingo.dev",
-  useDirective: true,
+  sourceLocale: "en",
+  targetLocales: ["en", "es", "fr", "de"], 
+  sourceRoot: "app", 
+  lingoDir: "lingo", 
   rsc: true,
-  debug: true,
+  useDirective: false,
+
+  models: "lingo.dev",
 })(nextConfig);
