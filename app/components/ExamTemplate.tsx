@@ -42,6 +42,7 @@ INSTRUCTIONS:
 3. Add more questions by copying the question format
 4. Make sure each question has exactly 4 options
 5. Save the file and upload it to automatically fill the exam form
+6. Ensure you remove the instructions from the template you'll be uploading
 
 EXAMPLE:
 --------

@@ -60,6 +60,16 @@ function CourseCard({
     return null;
   }
 
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text).then(() => {
+      toast.success('Address copied to clipboard!');
+    }).catch((err) => {
+      toast.error('Failed to copy address');
+    });
+  };
+
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -71,7 +81,11 @@ function CourseCard({
         {course.title}
       </h3>
       <p className="text-[#A0522D] mb-2">Tutor: {course.tutorName}</p>
-      <p className="text-[#CD853F] text-sm mb-3 font-mono">
+      <p
+        className="text-[#CD853F] text-sm mb-3 font-mono cursor-pointer hover:text-[#A0522D] transition-colors"
+        onClick={() => copyToClipboard(course.tutor)}
+        title="Click to copy tutor address"
+      >
         {`${course.tutor.slice(0, 6)}...${course.tutor.slice(-4)}`}
       </p>
 
@@ -79,7 +93,7 @@ function CourseCard({
         <div className="inline-block px-3 py-1 rounded-full text-sm bg-[#FAF0E6] border border-[#8B4513] text-[#8B4513] font-medium">
           Active
         </div>
-        
+
         {/* Enrollment status badge for students */}
         {!isTutor && isEnrolled && (
           <div className="inline-block px-3 py-1 rounded-full text-sm bg-green-100 border border-green-600 text-green-700 font-medium">
@@ -109,11 +123,10 @@ function CourseCard({
             whileTap={!isEnrolled ? { scale: 0.98 } : {}}
             onClick={() => onEnroll(course.courseId)}
             disabled={enrolling || isEnrolled} // Disable if already enrolled or enrolling
-            className={`w-full py-2 cursor-pointer text-[#F5F5DC] rounded-lg transition-colors font-medium ${
-              isEnrolled 
-                ? "bg-gray-400 cursor-not-allowed" 
+            className={`w-full py-2 cursor-pointer text-[#F5F5DC] rounded-lg transition-colors font-medium ${isEnrolled
+                ? "bg-gray-400 cursor-not-allowed"
                 : "bg-[#654321] hover:bg-[#8B4513] disabled:opacity-50 disabled:cursor-not-allowed"
-            }`}
+              }`}
           >
             {enrolling ? "Enrolling..." : isEnrolled ? "Already Enrolled" : "Enroll in Course"}
           </motion.button>

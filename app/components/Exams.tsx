@@ -405,7 +405,7 @@ export default function ExamsPage() {
         {isTutor && examIds.length === 0 && (
           <div className="text-center py-16 ">
             <p className="text-[#FFF8E1] text-xl">No exams created yet</p>
-       
+
           </div>
         )}
 
@@ -523,6 +523,22 @@ export default function ExamsPage() {
               >
                 Cancel
               </button>
+            </div>
+
+            <div className="mt-4 flex items-start justify-center gap-2 text-[#5D4037] opacity-80 px-2">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+                strokeWidth={1.5}
+                stroke="currentColor"
+                className="w-5 h-5 flex-shrink-0 mt-0.5"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
+              </svg>
+              <p className="text-sm text-center leading-tight">
+                <strong>Important:</strong> Please do not close this panel manually after clicking submit. The drawer will automatically close once your exam is successfully submitted.
+              </p>
             </div>
           </div>
         </Drawer>

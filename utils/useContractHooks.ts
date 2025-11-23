@@ -489,6 +489,13 @@ export function useCreateCourse() {
       hash,
     });
 
+  // Auto refresh on successful confirmation
+  useEffect(() => {
+    if (isConfirmed) {
+      window.location.reload();
+    }
+  }, [isConfirmed]);
+
   return {
     createCourse,
     hash,
@@ -522,6 +529,13 @@ export function useCreateExam() {
       hash,
     });
 
+  // Auto refresh on successful confirmation
+  useEffect(() => {
+    if (isConfirmed) {
+      window.location.reload();
+    }
+  }, [isConfirmed]);
+
   return {
     createExam,
     hash,
@@ -548,6 +562,13 @@ export function useEnrollInCourse() {
     useWaitForTransactionReceipt({
       hash,
     });
+
+  // Auto refresh on successful confirmation
+  useEffect(() => {
+    if (isConfirmed) {
+      window.location.reload();
+    }
+  }, [isConfirmed]);
 
   return {
     enrollInCourse,
@@ -576,6 +597,13 @@ export function useRegisterUser() {
       hash,
     });
 
+  // Auto refresh on successful confirmation
+  useEffect(() => {
+    if (isConfirmed) {
+      window.location.reload();
+    }
+  }, [isConfirmed]);
+
   return {
     registerUser,
     hash,
@@ -602,6 +630,13 @@ export function useTakeExam() {
     useWaitForTransactionReceipt({
       hash,
     });
+
+  // Auto refresh on successful confirmation
+  useEffect(() => {
+    if (isConfirmed) {
+      window.location.reload();
+    }
+  }, [isConfirmed]);
 
   return {
     takeExam,
