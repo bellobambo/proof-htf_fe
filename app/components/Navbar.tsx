@@ -3,6 +3,8 @@
 import { useAccount, useBalance } from "wagmi";
 import { useUsers } from "@/utils/useContractHooks";
 import { WalletConnect } from "./WalletConnect";
+import { LocaleSwitcher } from "lingo.dev/react/client";
+
 
 export default function Navbar() {
     const { address, isConnected } = useAccount();
@@ -86,6 +88,11 @@ export default function Navbar() {
                     </div>
 
                 </div>
+                <div className="bg-black">
+                {/* <LocaleSwitcher locales={["en", "es"]} /> */}
+
+                </div>
+
             </div>
         </nav>
     );
