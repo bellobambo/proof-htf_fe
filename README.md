@@ -1,6 +1,6 @@
 # ProofHTF Frontend 🎓
 
-A modern web3 learning management platform that brings blockchain education to life. Built with Next.js and Web3 technologies, this frontend connects students and tutors in a decentralized classroom where courses are created, assessments are taken, and scores are recorded on-chain. ✨
+A modern web3 learning management platform that brings blockchain education to life. Proof connects students and tutors in a decentralized classroom where courses are created, assessments are taken, and scores are recorded on-chain. ✨
 
 **Smart Contract:** `0x6bcEf738a4e1A3753Ae4652A08909a7665E709bd`  
 **Backend Repository:** [github.com/bellobambo/Proof-HTF](https://github.com/bellobambo/Proof-HTF)
