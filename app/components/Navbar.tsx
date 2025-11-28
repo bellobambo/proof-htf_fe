@@ -3,7 +3,7 @@
 import { useAccount, useBalance } from "wagmi";
 import { useUsers } from "@/utils/useContractHooks";
 import { WalletConnect } from "./WalletConnect";
-import TranslationModal from "./TranslationModal";
+import TranslationModal from "./TranslationDrawer";
 import toast from "react-hot-toast";
 
 export default function Navbar() {

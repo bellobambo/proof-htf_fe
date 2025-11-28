@@ -6,6 +6,7 @@ import {
     UserRole
 } from "@/utils/useContractHooks";
 import { useAccount } from "wagmi";
+import TranslationDrawer from "./TranslationDrawer";
 
 
 interface PastExamQuestionsProps {
@@ -150,7 +151,15 @@ export function PastExamQuestions({
 
     return (
         <Drawer
-            title={<span className="text-[#5D4037] text-xl font-bold">Exam Review: {examTitle}</span>}
+            title={
+
+                <div className="flex items-center justify-between w-full">
+
+                    <span className="text-[#5D4037] text-xl font-bold">Exam Review: {examTitle}</span>
+                    <TranslationDrawer />
+
+                </div>
+            }
             placement="right"
             onClose={onClose}
             open={isVisible}

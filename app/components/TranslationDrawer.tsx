@@ -5,12 +5,17 @@ import { Drawer } from 'antd'
 import { translateText } from '../actions/translate'
 
 const languages = [
-  { code: 'es', name: 'Spanish' },
+  { code: 'zh', name: 'Chinese' },
   { code: 'fr', name: 'French' },
   { code: 'de', name: 'German' },
-  { code: 'zh', name: 'Chinese' },
-  { code: 'it', name: 'Italian' }
+  { code: 'it', name: 'Italian' },
+  { code: 'ja', name: 'Japanese' },
+  { code: 'ko', name: 'Korean' },
+  { code: 'pt', name: 'Portuguese' },
+  { code: 'ru', name: 'Russian' },
+  { code: 'es', name: 'Spanish' }
 ]
+
 
 export default function TranslationDrawer() {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false)
