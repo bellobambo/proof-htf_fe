@@ -22,6 +22,7 @@ import {
 
 // Import the new component
 import { PastExamQuestions } from "./PastExamQuestions";
+import TranslationDrawer from "./TranslationDrawer";
 
 
 
@@ -412,9 +413,13 @@ export default function ExamsPage() {
         {/* Take Exam Drawer */}
         <Drawer
           title={
-            <span className="text-[#5D4037] text-xl font-bold">
-              Taking Exam: {selectedExam?.title}
-            </span>
+            <div className="flex items-center justify-between w-full">
+              <span className="text-[#5D4037] text-xl font-bold">
+                Taking Exam: {selectedExam?.title}
+              </span>
+
+              <TranslationDrawer />
+            </div>
           }
           placement="right"
           onClose={() => setTakeExamDrawerVisible(false)}
