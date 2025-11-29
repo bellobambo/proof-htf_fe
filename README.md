@@ -1,6 +1,6 @@
 # ProofHTF Frontend 🎓
 
-A modern web3 learning management platform that brings blockchain education to life. Proof connects students and tutors in a decentralized classroom where courses are created, assessments are taken, and scores are recorded on-chain. ✨
+Proof is a learning management platform that brings blockchain education to life. Proof connects students and tutors in a decentralized classroom where courses are created, assessments are taken, and scores are recorded on-chain. ✨
 
 ## 🌍 Powered by Lingo.dev Translation
 
