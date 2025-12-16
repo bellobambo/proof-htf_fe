@@ -11,8 +11,8 @@ export default function Navbar() {
     const { address, isConnected } = useAccount();
     const { data: userData } = useUsers(address);
     
-    // 1. Get Smart Account Address from Context
-    const { smartAccountAddress, isLoading: isSmartAccountLoading } = useSmartAccountContext();
+    // FIX: Destructure 'isPending' instead of 'isLoading'
+    const { smartAccountAddress, isPending: isSmartAccountLoading } = useSmartAccountContext();
 
     // 2. Get MetaMask (EOA) Balance
     const { data: eoaBalance } = useBalance({
@@ -20,12 +20,12 @@ export default function Navbar() {
         chainId: 11155111, // Sepolia
     });
 
-    // 3. Get Smart Account Balance (NEW)
+    // 3. Get Smart Account Balance
     const { data: smartAccountBalance } = useBalance({
         address: smartAccountAddress || undefined, 
         chainId: 11155111,
         query: {
-            enabled: !!smartAccountAddress // Only fetch if address exists
+            enabled: !!smartAccountAddress 
         }
     });
 
@@ -83,13 +83,16 @@ export default function Navbar() {
                         ) : (
                             <div className="flex items-center gap-3">
                                 
-                                {/* --- NEW: SMART ACCOUNT DISPLAY --- */}
-                                {/* This section is styled darkly to look distinct and "Premium" */}
+                                {/* --- SMART ACCOUNT DISPLAY --- */}
                                 {smartAccountAddress && (
                                     <div className="hidden md:flex flex-col items-end px-3 py-1 bg-[#4E342E] rounded-lg border border-[#8D6E63] shadow-sm">
-                                        <span className="text-[10px] text-[#D2B48C] font-bold tracking-wider uppercase">
-                                            Smart Account
-                                        </span>
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-[10px] text-[#D2B48C] font-bold tracking-wider uppercase">
+                                                Smart Account
+                                            </span>
+                                            {isSmartAccountLoading && <span className="text-[10px] text-yellow-400 animate-pulse">(Loading...)</span>}
+                                        </div>
+                                        
                                         <div className="flex items-center gap-2 text-[#F5F5DC]">
                                             <span className="text-sm font-bold">
                                                 {smartAccountBalance 
@@ -103,7 +106,6 @@ export default function Navbar() {
                                                 title="Copy Smart Account Address"
                                             >
                                                 {shortenAddress(smartAccountAddress)}
-                                                {/* Copy Icon */}
                                                 <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
                                             </button>
                                         </div>

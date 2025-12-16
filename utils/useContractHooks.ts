@@ -8,10 +8,12 @@ import {
 } from "wagmi";
 import { CONTRACT_ABI, CONTRACT_ADDRESS } from "./contract";
 import { useEffect, useMemo } from "react";
-import { useSmartAccount } from "./useSmartAccount";
+import { useSmartAccountContext } from "@/app/components/SmartAccountContext";
+import toast from "react-hot-toast";
+// 1. Ensure you import the Smart Account Context or Hook
+// import { useSmartAccountContext } from "@/context/SmartAccountContext";
 
-
-// Reuse existing interfaces and enums
+// --- Interfaces & Enums (Same as before) ---
 export enum UserRole {
   TUTOR = 0,
   STUDENT = 1,
@@ -89,34 +91,24 @@ export interface ExamAnswersComparison {
 
 export type QuestionOptions = [string, string, string, string];
 
-// FIXED: Return only the course count, not individual courses
+// --- Read Hooks (Unchanged) ---
+
 export function useGetAllCourses() {
   const { data: courseCount, error, isLoading } = useCourseCounter();
-
   const count = courseCount ? Number(courseCount) : 0;
-
-  return {
-    courseCount: count,
-    isLoading,
-    error,
-  };
+  return { courseCount: count, isLoading, error };
 }
 
-// FIXED: Return metadata instead of fetching all exams
 export function useGetAvailableExamsForStudent(
   studentAddress: `0x${string}` | undefined,
   options?: { query?: { enabled?: boolean } }
 ) {
   const enabled = options?.query?.enabled ?? !!studentAddress;
-
   const {
     data: enrolledCourses,
     isLoading: coursesLoading,
     error: coursesError,
-  } = useGetEnrolledCourses(studentAddress, {
-    query: { enabled },
-  });
-
+  } = useGetEnrolledCourses(studentAddress, { query: { enabled } });
   const { data: examCount, isLoading: examCountLoading } = useExamCounter();
 
   const examIds = useMemo(() => {
@@ -125,16 +117,9 @@ export function useGetAvailableExamsForStudent(
   }, [examCount]);
 
   const isLoading = coursesLoading || examCountLoading;
-
-  return {
-    examIds,
-    enrolledCourses,
-    isLoading,
-    error: coursesError,
-  };
+  return { examIds, enrolledCourses, isLoading, error: coursesError };
 }
 
-// Enhanced useGetEnrolledCourses to accept options
 export function useGetEnrolledCourses(
   studentAddress: `0x${string}` | undefined,
   options?: { query?: { enabled?: boolean } }
@@ -144,13 +129,10 @@ export function useGetEnrolledCourses(
     abi: CONTRACT_ABI,
     functionName: "getEnrolledCourses",
     args: studentAddress ? [studentAddress] : undefined,
-    query: {
-      enabled: options?.query?.enabled ?? !!studentAddress,
-    },
+    query: { enabled: options?.query?.enabled ?? !!studentAddress },
   });
 }
 
-// Keep all your existing view function hooks exactly as they are...
 export function useCourseCounter() {
   return useReadContract({
     address: CONTRACT_ADDRESS,
@@ -171,9 +153,7 @@ export function useCourseEnrollments(
       courseId !== undefined && studentAddress
         ? [courseId, studentAddress]
         : undefined,
-    query: {
-      enabled: courseId !== undefined && !!studentAddress,
-    },
+    query: { enabled: courseId !== undefined && !!studentAddress },
   });
 }
 
@@ -189,9 +169,7 @@ export function useCourseExams(
       courseId !== undefined && index !== undefined
         ? [courseId, index]
         : undefined,
-    query: {
-      enabled: courseId !== undefined && index !== undefined,
-    },
+    query: { enabled: courseId !== undefined && index !== undefined },
   });
 }
 
@@ -201,9 +179,7 @@ export function useCourses(courseId: bigint | undefined) {
     abi: CONTRACT_ABI,
     functionName: "courses",
     args: courseId !== undefined ? [courseId] : undefined,
-    query: {
-      enabled: courseId !== undefined,
-    },
+    query: { enabled: courseId !== undefined },
   });
 }
 
@@ -227,9 +203,7 @@ export function useExamCorrectAnswers(
       examId !== undefined && questionIndex !== undefined
         ? [examId, questionIndex]
         : undefined,
-    query: {
-      enabled: examId !== undefined && questionIndex !== undefined,
-    },
+    query: { enabled: examId !== undefined && questionIndex !== undefined },
   });
 }
 
@@ -269,9 +243,7 @@ export function useExamQuestions(
       examId !== undefined && questionIndex !== undefined
         ? [examId, questionIndex]
         : undefined,
-    query: {
-      enabled: examId !== undefined && questionIndex !== undefined,
-    },
+    query: { enabled: examId !== undefined && questionIndex !== undefined },
   });
 }
 
@@ -287,9 +259,7 @@ export function useExamSessions(
       examId !== undefined && studentAddress
         ? [examId, studentAddress]
         : undefined,
-    query: {
-      enabled: examId !== undefined && !!studentAddress,
-    },
+    query: { enabled: examId !== undefined && !!studentAddress },
   });
 }
 
@@ -299,9 +269,7 @@ export function useExams(examId: bigint | undefined) {
     abi: CONTRACT_ABI,
     functionName: "exams",
     args: examId !== undefined ? [examId] : undefined,
-    query: {
-      enabled: examId !== undefined,
-    },
+    query: { enabled: examId !== undefined },
   });
 }
 
@@ -311,9 +279,7 @@ export function useGetCourse(courseId: bigint | undefined) {
     abi: CONTRACT_ABI,
     functionName: "getCourse",
     args: courseId !== undefined ? [courseId] : undefined,
-    query: {
-      enabled: courseId !== undefined,
-    },
+    query: { enabled: courseId !== undefined },
   });
 }
 
@@ -323,9 +289,7 @@ export function useGetExam(examId: bigint | undefined) {
     abi: CONTRACT_ABI,
     functionName: "getExam",
     args: examId !== undefined ? [examId] : undefined,
-    query: {
-      enabled: examId !== undefined,
-    },
+    query: { enabled: examId !== undefined },
   });
 }
 
@@ -335,9 +299,7 @@ export function useGetExamQuestions(examId: bigint | undefined) {
     abi: CONTRACT_ABI,
     functionName: "getExamQuestions",
     args: examId !== undefined ? [examId] : undefined,
-    query: {
-      enabled: examId !== undefined,
-    },
+    query: { enabled: examId !== undefined },
   });
 }
 
@@ -353,16 +315,13 @@ export function useGetExamResults(
       examId !== undefined && studentAddress
         ? [examId, studentAddress]
         : undefined,
-    query: {
-      enabled: examId !== undefined && !!studentAddress,
-    },
+    query: { enabled: examId !== undefined && !!studentAddress },
   });
 }
 
 export function useGetPastExamForRevision(examId: bigint | undefined) {
   const { address } = useAccount();
   const { data: userData } = useUsers(address);
-
   const isStudent =
     userData?.role === UserRole.STUDENT && userData?.isRegistered;
 
@@ -371,37 +330,19 @@ export function useGetPastExamForRevision(examId: bigint | undefined) {
     abi: CONTRACT_ABI,
     functionName: "getPastExamForRevision",
     args: examId !== undefined ? [examId] : undefined,
-    query: {
-      enabled: examId !== undefined && isStudent && !!address,
-    },
+    query: { enabled: examId !== undefined && isStudent && !!address },
   });
 
-  // Transform the data
   const transformedData = useMemo(() => {
     if (!result.data) return null;
-
     const data = result.data as readonly [
-      readonly string[], // questionTexts
-      readonly [string, string, string, string][] // questionOptions
+      readonly string[],
+      readonly [string, string, string, string][],
     ];
-
-    console.log("📦 Past Exam Data Received:", {
-      questionCount: data[0].length,
-      optionsCount: data[1].length,
-    });
-
-    return {
-      questionTexts: data[0],
-      questionOptions: data[1],
-    };
+    return { questionTexts: data[0], questionOptions: data[1] };
   }, [result.data]);
 
-  return {
-    ...result,
-    data: transformedData,
-    isStudent,
-    userData,
-  };
+  return { ...result, data: transformedData, isStudent, userData };
 }
 
 export function useGetTutorCourses(tutorAddress: `0x${string}` | undefined) {
@@ -410,9 +351,7 @@ export function useGetTutorCourses(tutorAddress: `0x${string}` | undefined) {
     abi: CONTRACT_ABI,
     functionName: "getTutorCourses",
     args: tutorAddress ? [tutorAddress] : undefined,
-    query: {
-      enabled: !!tutorAddress,
-    },
+    query: { enabled: !!tutorAddress },
   });
 }
 
@@ -422,20 +361,28 @@ export function useRegisteredUsers(userAddress: `0x${string}` | undefined) {
     abi: CONTRACT_ABI,
     functionName: "registeredUsers",
     args: userAddress ? [userAddress] : undefined,
-    query: {
-      enabled: !!userAddress,
-    },
+    query: { enabled: !!userAddress },
   });
 }
 
-export function useUsers(userAddress: `0x${string}` | undefined) {
+export function useUsers(userAddress?: `0x${string}`) {
+  // 1. Get contexts
+  const { address: eoaAddress } = useAccount();
+  const { smartAccountAddress } = useSmartAccountContext();
+
+  // 2. Determine which address to fetch:
+  // - Priority 1: The specific address passed as an argument (if any)
+  // - Priority 2: The Smart Account Address (if connected)
+  // - Priority 3: The MetaMask EOA Address (fallback)
+  const addressToFetch = userAddress || smartAccountAddress || eoaAddress;
+
   const result = useReadContract({
     address: CONTRACT_ADDRESS,
     abi: CONTRACT_ABI,
     functionName: "users",
-    args: userAddress ? [userAddress] : undefined,
+    args: addressToFetch ? [addressToFetch] : undefined,
     query: {
-      enabled: !!userAddress,
+      enabled: !!addressToFetch,
     },
   });
 
@@ -453,27 +400,42 @@ export function useUsers(userAddress: `0x${string}` | undefined) {
   return {
     ...result,
     data: transformedData,
+    // Optional: Return which address was actually fetched for debugging
+    fetchedAddress: addressToFetch,
   };
 }
 
 // ----------------------------------------------------
-// FIXED USE CREATE COURSE HOOK
+// 1. UPDATED USE CREATE COURSE
 // ----------------------------------------------------
 export function useCreateCourse() {
-  const { sendBatchTx, isPending, error, userOpHash, smartAccountAddress } =
-    useSmartAccount();
+  const {
+    sendSessionTx, // Use the new function
+    requestSession,
+    hasSession,
+    isPending,
+    error,
+    userOpHash,
+    smartAccountAddress,
+  } = useSmartAccountContext();
 
-  // FIX: Convert null to undefined using ?? undefined
   const { data: userData } = useUsers(smartAccountAddress ?? undefined);
 
   const createCourse = async (title: string) => {
+    // 1. If no session, ask for one!
+    if (!hasSession) {
+      console.log("No session found. Requesting permission...");
+      await requestSession();
+      // You might want to return here and force the user to click "Create" again
+      // after granting, or try to proceed if state updates fast enough.
+      return;
+    }
+
     try {
       const calls = [];
 
-      if (!userData?.isRegistered) {
-        console.log(
-          "⚠️ Smart Account not registered. Batching registration..."
-        );
+      // Logic remains the same...
+      if (userData && userData.isRegistered === false) {
         calls.push({
           address: CONTRACT_ADDRESS,
           abi: CONTRACT_ABI,
@@ -489,31 +451,109 @@ export function useCreateCourse() {
         args: [title],
       });
 
-      const txHash = await sendBatchTx(calls);
+      // 2. Send via Session (No Popup)
+      await sendSessionTx({ calls });
 
-      if (txHash) {
-        console.log("✅ Operation Successful! Tx Hash:", txHash);
-        // Optional: reload to refresh UI
-        window.location.reload(); 
+      if (userOpHash) {
+        window.location.reload();
       }
     } catch (err) {
-      console.error("❌ Failed to create course:", err);
+      console.error("Create Course Failed", err);
     }
   };
 
   return {
     createCourse,
-    hash: userOpHash,
     isPending,
-    isConfirming: isPending,
-    isConfirmed: !!userOpHash,
     error,
+    isConfirmed: !!userOpHash,
   };
 }
 
+// ----------------------------------------------------
+// 2. UPDATED USE REGISTER USER
+// ----------------------------------------------------
+export function useRegisterUser() {
+  const {
+    sendSmartAccountTx,
+    isPending,
+    error,
+    userOpHash,
+    smartAccountAddress,
+  } = useSmartAccountContext();
+
+  // FIX: Fetch the Smart Account user details here!
+  const { data: userData, refetch } = useUsers(
+    smartAccountAddress ?? undefined
+  );
+
+  const registerUser = async (name: string, role: UserRole) => {
+    // 1. FIX: Guard clause for initialization
+    if (!smartAccountAddress) {
+      toast.error("Smart Account is initializing... please wait 2 seconds.");
+      return;
+    }
+
+    // FIX: Check registration status BEFORE sending transaction
+    if (userData?.isRegistered) {
+      console.log(
+        "✅ Smart Account is ALREADY registered. Skipping transaction."
+      );
+      toast.success("Already registered!");
+      return;
+    }
+
+    try {
+      const txHash = await sendSmartAccountTx({
+        address: CONTRACT_ADDRESS,
+        abi: CONTRACT_ABI,
+        functionName: "registerUser",
+        args: [name, role],
+      });
+
+      if (txHash) {
+        console.log(
+          "✅ Registered Smart Account Successfully! Tx Hash:",
+          txHash
+        );
+        toast.success("Registration successful!");
+        await refetch(); // Update UI immediately
+      }
+    } catch (err: any) {
+      // Handle the error if we missed the check
+      if (err.message?.includes("12416c72656164792072656769737465726564")) {
+        console.warn("⚠️ Blockchain said: User already registered.");
+      } else {
+        console.error("❌ Failed to register user:", err);
+        toast.error("Registration failed. See console.");
+      }
+    }
+  };
+
+  // Auto refresh
+  const isConfirmed = !!userOpHash;
+  useEffect(() => {
+    if (isConfirmed && !isPending) {
+      window.location.reload();
+    }
+  }, [isConfirmed, isPending]);
+
+  return {
+    registerUser,
+    hash: userOpHash,
+    isPending,
+    isConfirming: isPending,
+    isConfirmed,
+    error,
+    isAlreadyRegistered: userData?.isRegistered,
+    // FIX: Export readiness so UI can disable button
+    isReady: !!smartAccountAddress 
+  };
+}
+// --- Other Write Hooks (Standard) ---
+
 export function useCreateExam() {
   const { data: hash, writeContract, isPending, error } = useWriteContract();
-
   const createExam = (
     courseId: bigint,
     title: string,
@@ -528,32 +568,16 @@ export function useCreateExam() {
       args: [courseId, title, questionTexts, questionOptions, correctAnswers],
     });
   };
-
   const { isLoading: isConfirming, isSuccess: isConfirmed } =
-    useWaitForTransactionReceipt({
-      hash,
-    });
-
-  // Auto refresh on successful confirmation
+    useWaitForTransactionReceipt({ hash });
   useEffect(() => {
-    if (isConfirmed) {
-      window.location.reload();
-    }
+    if (isConfirmed) window.location.reload();
   }, [isConfirmed]);
-
-  return {
-    createExam,
-    hash,
-    isPending,
-    isConfirming,
-    isConfirmed,
-    error,
-  };
+  return { createExam, hash, isPending, isConfirming, isConfirmed, error };
 }
 
 export function useEnrollInCourse() {
   const { data: hash, writeContract, isPending, error } = useWriteContract();
-
   const enrollInCourse = (courseId: bigint) => {
     writeContract({
       address: CONTRACT_ADDRESS,
@@ -562,77 +586,16 @@ export function useEnrollInCourse() {
       args: [courseId],
     });
   };
-
   const { isLoading: isConfirming, isSuccess: isConfirmed } =
-    useWaitForTransactionReceipt({
-      hash,
-    });
-
-  // Auto refresh on successful confirmation
+    useWaitForTransactionReceipt({ hash });
   useEffect(() => {
-    if (isConfirmed) {
-      window.location.reload();
-    }
+    if (isConfirmed) window.location.reload();
   }, [isConfirmed]);
-
-  return {
-    enrollInCourse,
-    hash,
-    isPending,
-    isConfirming,
-    isConfirmed,
-    error,
-  };
-}
-
-// ----------------------------------------------------
-// FIXED USE REGISTER USER HOOK
-// ----------------------------------------------------
-export function useRegisterUser() {
-  const { sendSmartAccountTx, isPending, error, userOpHash } =
-    useSmartAccount();
-
-  const registerUser = async (name: string, role: UserRole) => {
-    try {
-      const txHash = await sendSmartAccountTx({
-        address: CONTRACT_ADDRESS,
-        abi: CONTRACT_ABI,
-        functionName: "registerUser",
-        args: [name, role],
-      });
-
-      if (txHash) {
-        console.log(
-          "✅ Registered Smart Account Successfully! Tx Hash:",
-          txHash
-        );
-      }
-    } catch (err) {
-      console.error("❌ Failed to register user:", err);
-    }
-  };
-
-  const isConfirmed = !!userOpHash;
-
-  useEffect(() => {
-    if (isConfirmed && !isPending) {
-      window.location.reload();
-    }
-  }, [isConfirmed, isPending]);
-
-  return {
-    registerUser,
-    hash: userOpHash,
-    isPending,
-    isConfirming: isPending,
-    isConfirmed,
-    error,
-  };
+  return { enrollInCourse, hash, isPending, isConfirming, isConfirmed, error };
 }
 
 export function useTakeExam() {
   const { data: hash, writeContract, isPending, error } = useWriteContract();
-
   const takeExam = (examId: bigint, answers: bigint[]) => {
     writeContract({
       address: CONTRACT_ADDRESS,
@@ -641,25 +604,10 @@ export function useTakeExam() {
       args: [examId, answers],
     });
   };
-
   const { isLoading: isConfirming, isSuccess: isConfirmed } =
-    useWaitForTransactionReceipt({
-      hash,
-    });
-
-  // Auto refresh on successful confirmation
+    useWaitForTransactionReceipt({ hash });
   useEffect(() => {
-    if (isConfirmed) {
-      window.location.reload();
-    }
+    if (isConfirmed) window.location.reload();
   }, [isConfirmed]);
-
-  return {
-    takeExam,
-    hash,
-    isPending,
-    isConfirming,
-    isConfirmed,
-    error,
-  };
+  return { takeExam, hash, isPending, isConfirming, isConfirmed, error };
 }

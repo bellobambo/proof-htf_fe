@@ -1,212 +1,248 @@
 'use client'
 
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react'
-import { useAccount, usePublicClient, useWalletClient } from 'wagmi'
+import { useAccount, usePublicClient } from 'wagmi'
 import { toMetaMaskSmartAccount, Implementation, MetaMaskSmartAccount } from '@metamask/smart-accounts-kit'
-// 1. IMPORT PAYMASTER CLIENT
+import { erc7715ProviderActions, erc7710BundlerActions } from "@metamask/smart-accounts-kit/actions";
 import { createBundlerClient, createPaymasterClient } from 'viem/account-abstraction'
-import { http, parseGwei, encodeFunctionData, Hash, Address } from 'viem'
+import { http, parseGwei, encodeFunctionData, Hash, Address, createWalletClient, custom } from 'viem'
+import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts'
+import { sepolia } from 'viem/chains'
 
+declare global {
+  interface Window {
+    ethereum?: any;
+  }
+}
+
+// 1. Fix: Add smartAccount to the Interface
 interface SmartAccountContextType {
+  smartAccount: MetaMaskSmartAccount | null; // <--- ADDED THIS
   smartAccountAddress: Address | null;
-  smartAccount: MetaMaskSmartAccount | null;
-  sendUserOp: (args: { abi: any; address: Address; functionName: string; args: any[]; value?: bigint }) => Promise<Hash | undefined>;
-  sendBatchUserOp: (args: { calls: { address: Address; abi: any; functionName: string; args: any[]; value?: bigint }[] }) => Promise<Hash | undefined>;
-  isLoading: boolean;
+  isPending: boolean;
   error: Error | null;
+  userOpHash: Hash | null;
+  
+  hasSession: boolean;
+  requestSession: () => Promise<void>;
+  sendSessionTx: (args: { calls: { address: Address; abi: any; functionName: string; args: any[]; value?: bigint }[] }) => Promise<Hash | undefined>;
+  sendSmartAccountTx: (args: { abi: any; address: Address; functionName: string; args: any[]; value?: bigint }) => Promise<Hash | undefined>;
 }
 
 const SmartAccountContext = createContext<SmartAccountContextType>({
+  smartAccount: null, // <--- ADDED THIS
   smartAccountAddress: null,
-  smartAccount: null,
-  sendUserOp: async () => undefined,
-  sendBatchUserOp: async () => undefined,
-  isLoading: false,
+  isPending: false,
   error: null,
+  userOpHash: null,
+  hasSession: false,
+  requestSession: async () => {},
+  sendSessionTx: async () => undefined,
+  sendSmartAccountTx: async () => undefined,
 });
 
 export function SmartAccountProvider({ children }: { children: ReactNode }) {
   const { address, isConnected } = useAccount();
-  const { data: walletClient } = useWalletClient();
   const publicClient = usePublicClient();
   
   const [smartAccount, setSmartAccount] = useState<MetaMaskSmartAccount | null>(null);
-  const [smartAccountAddress, setSmartAccountAddress] = useState<Address | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<Error | null>(null);
+  const [sessionAccount, setSessionAccount] = useState<any | null>(null);
+  const [grantedPermissions, setGrantedPermissions] = useState<any | null>(null);
 
-  // 1. Initialize Smart Account
+  const [smartAccountAddress, setSmartAccountAddress] = useState<Address | null>(null);
+  const [isPending, setIsPending] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
+  const [userOpHash, setUserOpHash] = useState<Hash | null>(null);
+
+  const getBundler = () => {
+    if (!publicClient) throw new Error("Public client not ready");
+    const bundlerUrl = "https://api.pimlico.io/v2/sepolia/rpc?apikey=pim_ebHNbdP8xTZAriphyLSKMD";
+    
+    return createBundlerClient({
+      client: publicClient,
+      transport: http(bundlerUrl),
+      paymaster: createPaymasterClient({ transport: http(bundlerUrl) }),
+      paymasterContext: { mode: 'SPONSORED' }
+    }).extend(erc7710BundlerActions());
+  }
+
+  // --- Initialize Master Account ---
   useEffect(() => {
-    if (!isConnected || !walletClient || !publicClient || !address) {
-        setSmartAccount(null);
-        setSmartAccountAddress(null);
+    if (!isConnected || !publicClient || !address || typeof window === 'undefined' || !window.ethereum) return;
+
+    const initAccount = async () => {
+      try {
+        const walletClient = createWalletClient({
+            account: address,
+            chain: sepolia,
+            transport: custom(window.ethereum)
+        });
+
+        const account = await toMetaMaskSmartAccount({
+          client: publicClient,
+          implementation: Implementation.Hybrid,
+          deployParams: [address, [], [], []],
+          deploySalt: '0x',
+          signer: { walletClient }, 
+        });
+        
+        setSmartAccount(account);
+        setSmartAccountAddress(account.address);
+        console.log("🔹 Master Smart Account Ready:", account.address);
+      } catch (err: any) {
+        console.error("Init Error:", err);
+      }
+    };
+    initAccount();
+  }, [isConnected, address, publicClient]);
+
+  // --- Request Session ---
+  const requestSession = async () => {
+    if (!smartAccountAddress || !window.ethereum) return;
+    setIsPending(true);
+    
+    try {
+        const pKey = generatePrivateKey();
+        const localAccount = privateKeyToAccount(pKey);
+        
+        const walletClientWith7715 = createWalletClient({
+            transport: custom(window.ethereum),
+            chain: sepolia
+        }).extend(erc7715ProviderActions());
+
+        if(!publicClient) return;
+        
+        const tempSessionSmartAccount = await toMetaMaskSmartAccount({
+            client: publicClient,
+            implementation: Implementation.Hybrid,
+            deployParams: [localAccount.address, [], [], []],
+            deploySalt: '0x',
+            signer: { account: localAccount },
+        });
+
+        console.log("👋 Requesting Permission...");
+        const permissions = await walletClientWith7715.requestExecutionPermissions([{
+            chainId: sepolia.id,
+            expiry: Math.floor(Date.now() / 1000) + 86400,
+            signer: {
+                type: "account",
+                data: { address: tempSessionSmartAccount.address },
+            },
+            permission: {
+                type: "native-token-periodic", 
+                data: {
+                    periodAmount: parseGwei("100000000"),
+                    periodDuration: 86400,
+                },
+            },
+            isAdjustmentAllowed: true, 
+        }]);
+
+        setGrantedPermissions(permissions[0]);
+        setSessionAccount(tempSessionSmartAccount);
+    } catch (err: any) {
+        console.error("Session Request Failed:", err);
+        setError(err);
+    } finally {
+        setIsPending(false);
+    }
+  };
+
+  // --- Send Session Transaction ---
+  const sendSessionTx = async ({ calls }: { calls: any[] }) => {
+    if (!sessionAccount || !grantedPermissions || !publicClient) throw new Error("No active session");
+    
+    setIsPending(true);
+    setError(null);
+    setUserOpHash(null);
+
+    try {
+        const bundler = getBundler();
+        const permissionsContext = grantedPermissions.context;
+        const delegationManager = grantedPermissions.signerMeta.delegationManager;
+
+        const formattedCalls = calls.map((call) => ({
+             to: call.address,
+             data: encodeFunctionData({ abi: call.abi, functionName: call.functionName, args: call.args }),
+             value: call.value || BigInt(0),
+             permissionsContext,
+             delegationManager,
+        }));
+
+        const hash = await bundler.sendUserOperationWithDelegation({
+            account: sessionAccount,
+            calls: formattedCalls,
+            maxFeePerGas: parseGwei('20'),
+            maxPriorityFeePerGas: parseGwei('2'),
+            publicClient
+        });
+        
+        await bundler.waitForUserOperationReceipt({ hash });
+        setUserOpHash(hash);
+        return hash;
+    } catch (err: any) {
+        setError(err);
+    } finally {
+        setIsPending(false);
+    }
+  };
+
+  // --- Send Standard Transaction ---
+  const sendSmartAccountTx = async ({ abi, address: to, functionName, args, value = BigInt(0) }: any) => {
+    if (!smartAccount) {
+        const msg = "Smart Account not ready. Please connect wallet.";
+        console.error(msg);
+        setError(new Error(msg));
         return;
     }
 
-    const initAccount = async () => {
-        setIsLoading(true);
-        try {
-            const account = await toMetaMaskSmartAccount({
-                client: publicClient,
-                implementation: Implementation.Hybrid,
-                deployParams: [address, [], [], []],
-                deploySalt: '0x',
-                signer: { walletClient },
-            });
-            setSmartAccount(account);
-            setSmartAccountAddress(account.address);
-            
-            // Log initial address for debugging
-            console.log("🔹 Smart Account Initialized:", account.address);
-        } catch (err: any) {
-            console.error("Smart Account Init Error:", err);
-            setError(err);
-        } finally {
-            setIsLoading(false);
-        }
-    };
-
-    initAccount();
-  }, [isConnected, address, walletClient, publicClient]);
-
-  // 2. Helper: Get Bundler with Paymaster
-  const getBundler = () => {
-    if (!publicClient) throw new Error("Public client not ready");
-    const bundlerUrl = process.env.NEXT_PUBLIC_SEPOLIA_RPC_URL; 
-    if (!bundlerUrl) throw new Error("Bundler URL missing");
-    
-    // Create Paymaster Client
-    const paymasterClient = createPaymasterClient({
-        transport: http(bundlerUrl),
-    });
-
-    // Create Bundler with Paymaster attached
-    return createBundlerClient({
-        client: publicClient,
-        transport: http(bundlerUrl),
-        paymaster: paymasterClient,
-        paymasterContext: { mode: 'SPONSORED' } 
-    });
-  }
-
-  // 3. Helper: Detailed Error Parsing
-  const handleSmartAccountError = (err: any, accountAddr: string | undefined) => {
-    // A. Log the raw details for you (the developer)
-    console.group("🚨 Smart Account Transaction Failed");
-    console.error("Error Name:", err.name);
-    console.error("Error Message:", err.message);
-    if (err.cause) console.error("Cause:", err.cause);
-    if (err.details) console.error("Details:", err.details);
-    console.groupEnd();
-
-    // B. Create a user-friendly message
-    let friendlyMessage = err.message;
-
-    // Check for Insufficient Funds (AA21)
-    if (
-        err.message?.includes("AA21") || 
-        err.message?.includes("InsufficientPrefundError") ||
-        err.name === "InsufficientPrefundError"
-    ) {
-        friendlyMessage = `Transaction failed: Insufficient funds. Even with a Paymaster, you may need a tiny amount of ETH for deployment or the Paymaster policy might be rejecting this request. Please send 0.01 Sepolia ETH to: ${accountAddr}`;
-    }
-    // Check for Reverted Transactions
-    else if (err.message?.includes("Execution reverted")) {
-        if (err.message?.includes("4e6f742061207475746f72")) {
-             friendlyMessage = "Transaction failed: You are not registered as a tutor.";
-        } else if (err.message?.includes("416c72656164792072656769737465726564")) {
-             friendlyMessage = "Transaction failed: User is already registered.";
-        } else {
-             friendlyMessage = "Transaction reverted by the smart contract. Check your inputs.";
-        }
-    }
-
-    const friendlyError = new Error(friendlyMessage);
-    setError(friendlyError);
-    throw friendlyError; 
-  };
-
-  // 4. Send Single UserOp
-  const sendUserOp = async ({ abi, address: to, functionName, args, value = BigInt(0) }: any) => {
-    if (!smartAccount) throw new Error("Smart Account not ready");
+    setIsPending(true);
     setError(null);
+    setUserOpHash(null);
     
     try {
+        // Force connection check
+        const tempClient = createWalletClient({ 
+            transport: custom(window.ethereum) 
+        });
+        await tempClient.requestAddresses(); 
+
         const bundler = getBundler();
         const callData = encodeFunctionData({ abi, functionName, args });
 
-        console.log(`📤 Sending UserOp to ${to}...`);
+        console.log(`📤 Sending Standard UserOp to ${to}...`);
 
         const hash = await bundler.sendUserOperation({
-            account: smartAccount,
+            account: smartAccount, 
             calls: [{ to, value, data: callData }],
             maxFeePerGas: parseGwei('20'),
             maxPriorityFeePerGas: parseGwei('2'),
         });
         
-        console.log("⏳ UserOp sent. Hash:", hash);
+        console.log("⏳ Waiting for receipt...", hash);
         await bundler.waitForUserOperationReceipt({ hash });
         
-        // --- ADDED SUCCESS LOGS ---
-        console.group("✅ Transaction Successful!");
-        console.log("Transaction Hash:", hash);
-        console.log("Sent From Smart Account:", smartAccountAddress);
-        console.log("View on Explorer:", `https://sepolia.etherscan.io/tx/${hash}`);
-        console.groupEnd();
-        
+        setUserOpHash(hash);
         return hash;
-    } catch (err) {
-        handleSmartAccountError(err, smartAccountAddress || "your address");
-    }
-  };
-
-  // 5. Send Batch UserOp
-  const sendBatchUserOp = async ({ calls }: any) => {
-    if (!smartAccount) throw new Error("Smart Account not ready");
-    setError(null);
-
-    try {
-        const bundler = getBundler();
-        
-        const formattedCalls = calls.map((call: any) => ({
-            to: call.address,
-            value: call.value || BigInt(0),
-            data: encodeFunctionData({ abi: call.abi, functionName: call.functionName, args: call.args })
-        }));
-
-        console.log(`🚀 Sending Batch of ${formattedCalls.length} calls...`);
-
-        const hash = await bundler.sendUserOperation({
-            account: smartAccount,
-            calls: formattedCalls,
-            maxFeePerGas: parseGwei('20'),
-            maxPriorityFeePerGas: parseGwei('2'),
-        });
-
-        console.log("⏳ Batch sent. Hash:", hash);
-        await bundler.waitForUserOperationReceipt({ hash });
-        
-        // --- ADDED SUCCESS LOGS ---
-        console.group("✅ Batch Transaction Successful!");
-        console.log("Transaction Hash:", hash);
-        console.log("Sent From Smart Account:", smartAccountAddress);
-        console.log("View on Explorer:", `https://sepolia.etherscan.io/tx/${hash}`);
-        console.groupEnd();
-
-        return hash;
-    } catch (err) {
-        handleSmartAccountError(err, smartAccountAddress || "your address");
+    } catch (err: any) {
+        console.error("Tx Failed:", err);
+        setError(err);
+    } finally {
+        setIsPending(false);
     }
   };
 
   return (
-    <SmartAccountContext.Provider value={{ 
-        smartAccount, 
-        smartAccountAddress, 
-        sendUserOp, 
-        sendBatchUserOp,
-        isLoading, 
-        error 
+    <SmartAccountContext.Provider value={{
+      smartAccount, // <--- 2. Fix: Pass smartAccount in the value object
+      smartAccountAddress,
+      isPending,
+      error,
+      userOpHash,
+      hasSession: !!sessionAccount,
+      requestSession,
+      sendSessionTx,
+      sendSmartAccountTx, 
     }}>
       {children}
     </SmartAccountContext.Provider>

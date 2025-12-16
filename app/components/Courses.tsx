@@ -20,9 +20,9 @@ import {
 } from "@/utils/useContractHooks";
 import ExamTemplate from "./ExamTemplate";
 import { PlusCircleOutlined, DeleteOutlined } from "@ant-design/icons";
-import SmartAccountControl from "./SmartAccountControl";
+import { useSmartAccountContext } from "./SmartAccountContext";
 
-import { useSmartAccount } from "@/utils/useSmartAccount";
+
 // Separate component for individual course to properly use hooks
 function CourseCard({
   courseId,
@@ -122,8 +122,8 @@ function CourseCard({
             onClick={() => onEnroll(course.courseId)}
             disabled={enrolling || isEnrolled}
             className={`w-full py-2 cursor-pointer text-[#F5F5DC] rounded-lg transition-colors font-medium ${isEnrolled
-                ? "bg-gray-400 cursor-not-allowed"
-                : "bg-[#654321] hover:bg-[#8B4513] disabled:opacity-50 disabled:cursor-not-allowed"
+              ? "bg-gray-400 cursor-not-allowed"
+              : "bg-[#654321] hover:bg-[#8B4513] disabled:opacity-50 disabled:cursor-not-allowed"
               }`}
           >
             {enrolling ? "Enrolling..." : isEnrolled ? "Already Enrolled" : "Enroll in Course"}
@@ -136,9 +136,9 @@ function CourseCard({
 
 export default function Courses() {
   const { address } = useAccount(); // EOA Address
-  
+
   // 2. GET SMART ACCOUNT ADDRESS
-  const { smartAccountAddress } = useSmartAccount();
+  const { smartAccountAddress } = useSmartAccountContext();
 
   // 3. DETERMINE ACTIVE ADDRESS
   // If Smart Account exists, use it. Otherwise fallback to MetaMask EOA.
@@ -148,20 +148,20 @@ export default function Courses() {
   // 4. USE ACTIVE ADDRESS IN HOOKS
   const { data: userData } = useUsers(activeAddress);
   const { courseCount, isLoading, error } = useGetAllCourses();
-  
+
   // Fetch courses owned by the Smart Account
   const { data: tutorCourses } = useGetTutorCourses(activeAddress);
-  
+
   const { enrollInCourse, isPending: enrolling } = useEnrollInCourse();
-  
+
   const {
     createCourse,
     isPending: creatingCourse,
-    isConfirming: confirmingCourse,
+    // isConfirming: confirmingCourse, <--- REMOVED THIS
     isConfirmed: courseCreated,
     error: createError
   } = useCreateCourse();
-  
+
   const {
     createExam,
     isPending: creatingExam,
@@ -333,12 +333,11 @@ export default function Courses() {
               {isTutor ? "Tutor Dashboard" : "Student Dashboard"}
             </p>
             {/* Debug Info (Optional - remove before production) */}
-             <div className="text-xs text-[#D2B48C] mt-1">
+            <div className="text-xs text-[#D2B48C] mt-1">
               {smartAccountAddress ? "Using Smart Account" : "Using Wallet"}
             </div>
           </div>
 
-          {/* <SmartAccountControl/> */}
           {isTutor && (
             <motion.button
               whileHover={{ scale: 1.05 }}
@@ -405,7 +404,8 @@ export default function Courses() {
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 className="fixed inset-0 bg-black/40 bg-opacity-30 z-50 flex items-center justify-center p-4"
-                onClick={() => !creatingCourse && !confirmingCourse && setCreateModalVisible(false)}
+                // FIX: Removed !confirmingCourse check
+                onClick={() => !creatingCourse && setCreateModalVisible(false)}
               >
                 {/* Modal */}
                 <motion.div
@@ -422,8 +422,10 @@ export default function Courses() {
                       Create New Course
                     </h2>
                     <button
-                      onClick={() => !creatingCourse && !confirmingCourse && setCreateModalVisible(false)}
-                      disabled={creatingCourse || confirmingCourse}
+                      // FIX: Removed !confirmingCourse check
+                      onClick={() => !creatingCourse && setCreateModalVisible(false)}
+                      // FIX: Removed confirmingCourse check
+                      disabled={creatingCourse}
                       className="text-[#8B4513] hover:text-[#654321] transition-colors text-2xl disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       ×
@@ -441,7 +443,8 @@ export default function Courses() {
                         value={newCourseTitle}
                         onChange={(e) => setNewCourseTitle(e.target.value)}
                         placeholder="Enter course title"
-                        disabled={creatingCourse || confirmingCourse}
+                        // FIX: Removed confirmingCourse check
+                        disabled={creatingCourse}
                         className="w-full p-4 border-2 border-[#D2B48C] rounded-xl focus:border-[#8B4513] focus:ring-2 focus:ring-[#8B4513] focus:ring-opacity-20 transition-colors bg-white text-[#8B4513] placeholder-[#A0522D] text-lg disabled:opacity-50 disabled:cursor-not-allowed"
                         autoFocus
                       />
@@ -450,22 +453,23 @@ export default function Courses() {
                     {/* Buttons */}
                     <div className="flex gap-3 pt-4">
                       <motion.button
-                        whileHover={{ scale: creatingCourse || confirmingCourse ? 1 : 1.02 }}
-                        whileTap={{ scale: creatingCourse || confirmingCourse ? 1 : 0.98 }}
+                        // FIX: Simplified scale logic
+                        whileHover={{ scale: creatingCourse ? 1 : 1.02 }}
+                        whileTap={{ scale: creatingCourse ? 1 : 0.98 }}
                         onClick={handleCreateCourse}
-                        disabled={creatingCourse || confirmingCourse || !newCourseTitle.trim()}
+                        // FIX: Removed confirmingCourse check
+                        disabled={creatingCourse || !newCourseTitle.trim()}
                         className="flex-1 py-3 bg-[#8B4513] cursor-pointer text-[#F5F5DC] rounded-xl hover:bg-[#654321] transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-lg"
                       >
-                        {/* {creatingCourse && "Confirming in Wallet..."} */}
-                        {creatingCourse && null}
-                        {confirmingCourse && "Creating Course..."}
-                        {!creatingCourse && !confirmingCourse && "Create Course"}
+                        {/* FIX: Simplified Text Logic */}
+                        {creatingCourse ? "Creating Course..." : "Create Course"}
                       </motion.button>
+
                       <motion.button
-                        whileHover={{ scale: creatingCourse || confirmingCourse ? 1 : 1.02 }}
-                        whileTap={{ scale: creatingCourse || confirmingCourse ? 1 : 0.98 }}
+                        whileHover={{ scale: creatingCourse ? 1 : 1.02 }}
+                        whileTap={{ scale: creatingCourse ? 1 : 0.98 }}
                         onClick={() => setCreateModalVisible(false)}
-                        disabled={creatingCourse || confirmingCourse}
+                        disabled={creatingCourse}
                         className="flex-1 py-3 border-2 border-[#8B4513] cursor-pointer text-[#8B4513] rounded-xl hover:border-[#654321] hover:bg-[#F5F5DC]/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-lg"
                       >
                         Cancel
