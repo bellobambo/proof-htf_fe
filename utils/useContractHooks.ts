@@ -8,6 +8,8 @@ import {
 } from "wagmi";
 import { CONTRACT_ABI, CONTRACT_ADDRESS } from "./contract";
 import { useEffect, useMemo } from "react";
+import { useSmartAccount } from "./useSmartAccount";
+
 
 // Reuse existing interfaces and enums
 export enum UserRole {
@@ -88,7 +90,6 @@ export interface ExamAnswersComparison {
 export type QuestionOptions = [string, string, string, string];
 
 // FIXED: Return only the course count, not individual courses
-// Let the component handle fetching individual courses
 export function useGetAllCourses() {
   const { data: courseCount, error, isLoading } = useCourseCounter();
 
@@ -102,7 +103,6 @@ export function useGetAllCourses() {
 }
 
 // FIXED: Return metadata instead of fetching all exams
-// Let the component handle individual exam fetches
 export function useGetAvailableExamsForStudent(
   studentAddress: `0x${string}` | undefined,
   options?: { query?: { enabled?: boolean } }
@@ -376,22 +376,6 @@ export function useGetPastExamForRevision(examId: bigint | undefined) {
     },
   });
 
-  // Add debug logging
-  useEffect(() => {
-    if (examId && address) {
-      console.group("🎯 useGetPastExamForRevision Debug");
-      console.log("Address:", address);
-      console.log("Exam ID:", examId.toString());
-      console.log("User Data:", userData);
-      console.log("Is Student:", isStudent);
-      console.log(
-        "Hook Enabled:",
-        examId !== undefined && isStudent && !!address
-      );
-      console.groupEnd();
-    }
-  }, [examId, address, userData, isStudent]);
-
   // Transform the data
   const transformedData = useMemo(() => {
     if (!result.data) return null;
@@ -472,36 +456,57 @@ export function useUsers(userAddress: `0x${string}` | undefined) {
   };
 }
 
+// ----------------------------------------------------
+// FIXED USE CREATE COURSE HOOK
+// ----------------------------------------------------
 export function useCreateCourse() {
-  const { data: hash, writeContract, isPending, error } = useWriteContract();
+  const { sendBatchTx, isPending, error, userOpHash, smartAccountAddress } =
+    useSmartAccount();
 
-  const createCourse = (title: string) => {
-    writeContract({
-      address: CONTRACT_ADDRESS,
-      abi: CONTRACT_ABI,
-      functionName: "createCourse",
-      args: [title],
-    });
-  };
+  // FIX: Convert null to undefined using ?? undefined
+  const { data: userData } = useUsers(smartAccountAddress ?? undefined);
 
-  const { isLoading: isConfirming, isSuccess: isConfirmed } =
-    useWaitForTransactionReceipt({
-      hash,
-    });
+  const createCourse = async (title: string) => {
+    try {
+      const calls = [];
 
-  // Auto refresh on successful confirmation
-  useEffect(() => {
-    if (isConfirmed) {
-      window.location.reload();
+      if (!userData?.isRegistered) {
+        console.log(
+          "⚠️ Smart Account not registered. Batching registration..."
+        );
+        calls.push({
+          address: CONTRACT_ADDRESS,
+          abi: CONTRACT_ABI,
+          functionName: "registerUser",
+          args: ["Smart Account Tutor", UserRole.TUTOR],
+        });
+      }
+
+      calls.push({
+        address: CONTRACT_ADDRESS,
+        abi: CONTRACT_ABI,
+        functionName: "createCourse",
+        args: [title],
+      });
+
+      const txHash = await sendBatchTx(calls);
+
+      if (txHash) {
+        console.log("✅ Operation Successful! Tx Hash:", txHash);
+        // Optional: reload to refresh UI
+        window.location.reload(); 
+      }
+    } catch (err) {
+      console.error("❌ Failed to create course:", err);
     }
-  }, [isConfirmed]);
+  };
 
   return {
     createCourse,
-    hash,
+    hash: userOpHash,
     isPending,
-    isConfirming,
-    isConfirmed,
+    isConfirming: isPending,
+    isConfirmed: !!userOpHash,
     error,
   };
 }
@@ -580,35 +585,46 @@ export function useEnrollInCourse() {
   };
 }
 
+// ----------------------------------------------------
+// FIXED USE REGISTER USER HOOK
+// ----------------------------------------------------
 export function useRegisterUser() {
-  const { data: hash, writeContract, isPending, error } = useWriteContract();
+  const { sendSmartAccountTx, isPending, error, userOpHash } =
+    useSmartAccount();
 
-  const registerUser = (name: string, role: UserRole) => {
-    writeContract({
-      address: CONTRACT_ADDRESS,
-      abi: CONTRACT_ABI,
-      functionName: "registerUser",
-      args: [name, role],
-    });
+  const registerUser = async (name: string, role: UserRole) => {
+    try {
+      const txHash = await sendSmartAccountTx({
+        address: CONTRACT_ADDRESS,
+        abi: CONTRACT_ABI,
+        functionName: "registerUser",
+        args: [name, role],
+      });
+
+      if (txHash) {
+        console.log(
+          "✅ Registered Smart Account Successfully! Tx Hash:",
+          txHash
+        );
+      }
+    } catch (err) {
+      console.error("❌ Failed to register user:", err);
+    }
   };
 
-  const { isLoading: isConfirming, isSuccess: isConfirmed } =
-    useWaitForTransactionReceipt({
-      hash,
-    });
+  const isConfirmed = !!userOpHash;
 
-  // Auto refresh on successful confirmation
   useEffect(() => {
-    if (isConfirmed) {
+    if (isConfirmed && !isPending) {
       window.location.reload();
     }
-  }, [isConfirmed]);
+  }, [isConfirmed, isPending]);
 
   return {
     registerUser,
-    hash,
+    hash: userOpHash,
     isPending,
-    isConfirming,
+    isConfirming: isPending,
     isConfirmed,
     error,
   };

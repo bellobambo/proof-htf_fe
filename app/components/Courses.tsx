@@ -16,12 +16,13 @@ import {
   useCreateCourse,
   useGetCourse,
   useCreateExam,
-  useCourseEnrollments // Add this import
+  useCourseEnrollments
 } from "@/utils/useContractHooks";
 import ExamTemplate from "./ExamTemplate";
 import { PlusCircleOutlined, DeleteOutlined } from "@ant-design/icons";
+import SmartAccountControl from "./SmartAccountControl";
 
-
+import { useSmartAccount } from "@/utils/useSmartAccount";
 // Separate component for individual course to properly use hooks
 function CourseCard({
   courseId,
@@ -41,7 +42,7 @@ function CourseCard({
   userAddress: `0x${string}` | undefined;
 }) {
   const { data: course, isLoading } = useGetCourse(courseId);
-  const { data: isEnrolled } = useCourseEnrollments(courseId, userAddress); // Check enrollment status
+  const { data: isEnrolled } = useCourseEnrollments(courseId, userAddress);
 
   if (isLoading) {
     return (
@@ -60,7 +61,6 @@ function CourseCard({
     return null;
   }
 
-
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text).then(() => {
       toast.success('Address copied to clipboard!');
@@ -68,7 +68,6 @@ function CourseCard({
       toast.error('Failed to copy address');
     });
   };
-
 
   return (
     <motion.div
@@ -102,7 +101,6 @@ function CourseCard({
         )}
       </div>
 
-      {/* Buttons container */}
       <div className="space-y-2">
         {/* Create Exam button for tutors */}
         {isTutor && (
@@ -122,7 +120,7 @@ function CourseCard({
             whileHover={!isEnrolled ? { scale: 1.02 } : {}}
             whileTap={!isEnrolled ? { scale: 0.98 } : {}}
             onClick={() => onEnroll(course.courseId)}
-            disabled={enrolling || isEnrolled} // Disable if already enrolled or enrolling
+            disabled={enrolling || isEnrolled}
             className={`w-full py-2 cursor-pointer text-[#F5F5DC] rounded-lg transition-colors font-medium ${isEnrolled
                 ? "bg-gray-400 cursor-not-allowed"
                 : "bg-[#654321] hover:bg-[#8B4513] disabled:opacity-50 disabled:cursor-not-allowed"
@@ -136,13 +134,26 @@ function CourseCard({
   );
 }
 
-// The rest of your component remains the same...
 export default function Courses() {
-  const { address } = useAccount();
-  const { data: userData } = useUsers(address);
+  const { address } = useAccount(); // EOA Address
+  
+  // 2. GET SMART ACCOUNT ADDRESS
+  const { smartAccountAddress } = useSmartAccount();
+
+  // 3. DETERMINE ACTIVE ADDRESS
+  // If Smart Account exists, use it. Otherwise fallback to MetaMask EOA.
+  // This ensures we fetch data for the actual creator of the courses.
+  const activeAddress = smartAccountAddress || address;
+
+  // 4. USE ACTIVE ADDRESS IN HOOKS
+  const { data: userData } = useUsers(activeAddress);
   const { courseCount, isLoading, error } = useGetAllCourses();
-  const { data: tutorCourses } = useGetTutorCourses(address);
+  
+  // Fetch courses owned by the Smart Account
+  const { data: tutorCourses } = useGetTutorCourses(activeAddress);
+  
   const { enrollInCourse, isPending: enrolling } = useEnrollInCourse();
+  
   const {
     createCourse,
     isPending: creatingCourse,
@@ -150,6 +161,7 @@ export default function Courses() {
     isConfirmed: courseCreated,
     error: createError
   } = useCreateCourse();
+  
   const {
     createExam,
     isPending: creatingExam,
@@ -172,7 +184,6 @@ export default function Courses() {
 
   const isTutor = userData?.role === UserRole.TUTOR;
 
-  // For tutors, use their specific courses. For students, show all available courses
   const courseIds = isTutor && tutorCourses
     ? tutorCourses.map((course: Course) => course.courseId)
     : Array.from({ length: courseCount }, (_, i) => BigInt(i));
@@ -261,7 +272,6 @@ export default function Courses() {
       return;
     }
 
-    // Validate all questions are complete
     const invalidQuestion = questions.find(
       q => !q.text.trim() || q.options.some(opt => !opt.trim())
     );
@@ -279,7 +289,6 @@ export default function Courses() {
     toast.success("Creating exam...");
   };
 
-  // Function to handle template import
   const handleTemplateImport = (file: File, examTitle: string, importedQuestions: any[]) => {
     try {
       if (examTitle) {
@@ -318,12 +327,18 @@ export default function Courses() {
         <div className="flex justify-between items-center mb-8">
           <div>
             <h1 className="text-3xl font-bold text-[#F5F5DC]">
-              Welcome back, {userData?.name}!
+              Welcome back, {userData?.name || "User"}!
             </h1>
             <p className="text-[#F5F5DC] mt-2">
               {isTutor ? "Tutor Dashboard" : "Student Dashboard"}
             </p>
+            {/* Debug Info (Optional - remove before production) */}
+             <div className="text-xs text-[#D2B48C] mt-1">
+              {smartAccountAddress ? "Using Smart Account" : "Using Wallet"}
+            </div>
           </div>
+
+          {/* <SmartAccountControl/> */}
           {isTutor && (
             <motion.button
               whileHover={{ scale: 1.05 }}
@@ -364,7 +379,8 @@ export default function Courses() {
                 enrolling={enrolling}
                 onEnroll={handleEnroll}
                 onCreateExam={handleOpenCreateExam}
-                userAddress={address}
+                // 5. Pass the Active Address to the card too
+                userAddress={activeAddress}
               />
             ))}
           </div>
@@ -374,11 +390,11 @@ export default function Courses() {
               <p className="text-[#F5F5DC] text-xl mb-4">
                 {isTutor ? "No courses created yet" : "No courses available"}
               </p>
-
             </div>
           )}
         </div>
 
+        {/* ... (Keep your Modals and Drawers exactly as they were) ... */}
         {/* Custom Create Course Modal */}
         <AnimatePresence>
           {createModalVisible && (
@@ -440,7 +456,8 @@ export default function Courses() {
                         disabled={creatingCourse || confirmingCourse || !newCourseTitle.trim()}
                         className="flex-1 py-3 bg-[#8B4513] cursor-pointer text-[#F5F5DC] rounded-xl hover:bg-[#654321] transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-lg"
                       >
-                        {creatingCourse && "Confirming in Wallet..."}
+                        {/* {creatingCourse && "Confirming in Wallet..."} */}
+                        {creatingCourse && null}
                         {confirmingCourse && "Creating Course..."}
                         {!creatingCourse && !confirmingCourse && "Create Course"}
                       </motion.button>
@@ -565,7 +582,7 @@ export default function Courses() {
                     <div className="space-y-2 mb-3">
                       {question.options.map((option, optIndex) => (
                         <div key={optIndex} className="flex items-center gap-2">
-                          <span className="text-sm font-medium text-[#8B4513] min-w-[80px]">
+                          <span className="text-sm font-medium text-[#8B4513] min-w-20">
                             {String.fromCharCode(97 + optIndex)})
                           </span>
                           <input
@@ -630,4 +647,4 @@ export default function Courses() {
       </div>
     </div>
   );
-}
+} 
