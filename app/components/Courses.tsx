@@ -1,4 +1,3 @@
-// components/CoursesDashboard.tsx
 "use client";
 
 import { useState, useEffect } from "react";
@@ -16,11 +15,11 @@ import {
   useCreateCourse,
   useGetCourse,
   useCreateExam,
-  useCourseEnrollments // Add this import
+  useCourseEnrollments,
+  useTipTutor // <--- Ensure this is exported from your hooks file
 } from "@/utils/useContractHooks";
 import ExamTemplate from "./ExamTemplate";
-import { PlusCircleOutlined, DeleteOutlined } from "@ant-design/icons";
-
+import { PlusCircleOutlined, DeleteOutlined, GiftOutlined } from "@ant-design/icons";
 
 // Separate component for individual course to properly use hooks
 function CourseCard({
@@ -41,7 +40,12 @@ function CourseCard({
   userAddress: `0x${string}` | undefined;
 }) {
   const { data: course, isLoading } = useGetCourse(courseId);
-  const { data: isEnrolled } = useCourseEnrollments(courseId, userAddress); // Check enrollment status
+  const { data: isEnrolled } = useCourseEnrollments(courseId, userAddress);
+  
+  // Tip State
+  const [showTipInput, setShowTipInput] = useState(true);
+  const [tipAmount, setTipAmount] = useState("");
+  const { sendTip, isPending: isTipping, tipHash, error: tipError } = useTipTutor();
 
   if (isLoading) {
     return (
@@ -60,7 +64,6 @@ function CourseCard({
     return null;
   }
 
-
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text).then(() => {
       toast.success('Address copied to clipboard!');
@@ -69,41 +72,51 @@ function CourseCard({
     });
   };
 
+  const handleSendTip = async () => {
+    if (!tipAmount || parseFloat(tipAmount) <= 0) {
+        toast.error("Please enter a valid amount");
+        return;
+    }
+    await sendTip(course.tutor, tipAmount);
+    // Note: Success toast is handled in the hook, or you can add one here if hook doesn't have it
+  };
 
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: index * 0.1 }}
-      className="bg-[#F5F5DC] p-6 rounded-xl border-2 border-[#8B4513] hover:border-[#A0522D] transition-colors shadow-sm"
+      className="bg-[#F5F5DC] p-6 rounded-xl border-2 border-[#8B4513] hover:border-[#A0522D] transition-colors shadow-sm flex flex-col h-full"
     >
-      <h3 className="text-xl font-semibold text-[#8B4513] mb-2">
-        {course.title}
-      </h3>
-      <p className="text-[#A0522D] mb-2">Tutor: {course.tutorName}</p>
-      <p
-        className="text-[#CD853F] text-sm mb-3 font-mono cursor-pointer hover:text-[#A0522D] transition-colors"
-        onClick={() => copyToClipboard(course.tutor)}
-        title="Click to copy tutor address"
-      >
-        {`${course.tutor.slice(0, 6)}...${course.tutor.slice(-4)}`}
-      </p>
+      <div className="flex-grow">
+        <h3 className="text-xl font-semibold text-[#8B4513] mb-2">
+          {course.title}
+        </h3>
+        <p className="text-[#A0522D] mb-2">Tutor: {course.tutorName}</p>
+        <p
+          className="text-[#CD853F] text-sm mb-3 font-mono cursor-pointer hover:text-[#A0522D] transition-colors"
+          onClick={() => copyToClipboard(course.tutor)}
+          title="Click to copy tutor address"
+        >
+          {`${course.tutor.slice(0, 6)}...${course.tutor.slice(-4)}`}
+        </p>
 
-      <div className="flex items-center gap-2 mb-4">
-        <div className="inline-block px-3 py-1 rounded-full text-sm bg-[#FAF0E6] border border-[#8B4513] text-[#8B4513] font-medium">
-          Active
-        </div>
-
-        {/* Enrollment status badge for students */}
-        {!isTutor && isEnrolled && (
-          <div className="inline-block px-3 py-1 rounded-full text-sm bg-green-100 border border-green-600 text-green-700 font-medium">
-            Enrolled
+        <div className="flex items-center gap-2 mb-4">
+          <div className="inline-block px-3 py-1 rounded-full text-sm bg-[#FAF0E6] border border-[#8B4513] text-[#8B4513] font-medium">
+            Active
           </div>
-        )}
+
+          {/* Enrollment status badge for students */}
+          {!isTutor && isEnrolled && (
+            <div className="inline-block px-3 py-1 rounded-full text-sm bg-green-100 border border-green-600 text-green-700 font-medium">
+              Enrolled
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Buttons container */}
-      <div className="space-y-2">
+      <div className="space-y-3 mt-4">
         {/* Create Exam button for tutors */}
         {isTutor && (
           <motion.button
@@ -116,27 +129,88 @@ function CourseCard({
           </motion.button>
         )}
 
-        {/* Enroll button for students */}
+        {/* Student Actions */}
         {!isTutor && (
-          <motion.button
-            whileHover={!isEnrolled ? { scale: 1.02 } : {}}
-            whileTap={!isEnrolled ? { scale: 0.98 } : {}}
-            onClick={() => onEnroll(course.courseId)}
-            disabled={enrolling || isEnrolled} // Disable if already enrolled or enrolling
-            className={`w-full py-2 cursor-pointer text-[#F5F5DC] rounded-lg transition-colors font-medium ${isEnrolled
-                ? "bg-gray-400 cursor-not-allowed"
-                : "bg-[#654321] hover:bg-[#8B4513] disabled:opacity-50 disabled:cursor-not-allowed"
+          <>
+            {/* Enroll Button */}
+            <motion.button
+              whileHover={!isEnrolled ? { scale: 1.02 } : {}}
+              whileTap={!isEnrolled ? { scale: 0.98 } : {}}
+              onClick={() => onEnroll(course.courseId)}
+              disabled={enrolling || isEnrolled}
+              className={`w-full py-2 cursor-pointer text-[#F5F5DC] rounded-lg transition-colors font-medium ${
+                isEnrolled
+                  ? "bg-gray-400 cursor-not-allowed"
+                  : "bg-[#654321] hover:bg-[#8B4513] disabled:opacity-50 disabled:cursor-not-allowed"
               }`}
-          >
-            {enrolling ? "Enrolling..." : isEnrolled ? "Already Enrolled" : "Enroll in Course"}
-          </motion.button>
+            >
+              {enrolling ? "Enrolling..." : isEnrolled ? "Enrolled" : "Enroll in Course"}
+            </motion.button>
+
+            {/* Tipping Section */}
+            <div className="pt-3 border-t border-[#D2B48C]">
+                {!showTipInput ? (
+                    <button 
+                        onClick={() => setShowTipInput(true)}
+                        className="w-full py-2 border border-[#8B4513] text-[#8B4513] rounded-lg hover:bg-[#FAF0E6] transition-colors text-sm font-medium flex items-center justify-center gap-2"
+                    >
+                        <GiftOutlined /> Tip Tutor
+                    </button>
+                ) : (
+                    <div className="bg-[#FAF0E6] p-3 rounded-lg border border-[#D2B48C]">
+                        <div className="text-xs text-[#8B4513] mb-2 font-medium">Send ETH to Tutor</div>
+                        <div className="flex gap-2">
+                            <div className="relative flex-grow">
+                                <span className="absolute left-2 top-1.5 text-[#8B4513] text-sm">Ξ</span>
+                                <input 
+                                    type="number" 
+                                    placeholder="0.001"
+                                    step="0.001"
+                                    value={tipAmount}
+                                    onChange={(e) => setTipAmount(e.target.value)}
+                                    className="w-full pl-5 pr-2 py-1.5 text-sm border border-[#D2B48C] rounded bg-white text-[#8B4513] focus:outline-none focus:border-[#8B4513]"
+                                />
+                            </div>
+                            <button 
+                                onClick={handleSendTip}
+                                disabled={isTipping || !tipAmount}
+                                className="bg-[#8B4513] text-[#F5F5DC] px-3 py-1.5 rounded text-sm font-medium hover:bg-[#654321] disabled:opacity-50"
+                            >
+                                {isTipping ? "..." : "Send"}
+                            </button>
+                        </div>
+                        
+                        {/* Error Message */}
+                        {tipError && (
+                            <div className="text-xs text-red-600 mt-2 leading-tight">
+                                {tipError.includes('period limit') ? "Daily limit reached" : "Failed to send"}
+                            </div>
+                        )}
+
+                        {/* Success Message / Hash Link */}
+                        {tipHash && (
+                            <div className="text-xs text-green-700 mt-2">
+                                ✅ Sent! <a href={`https://sepolia.etherscan.io/tx/${tipHash}`} target="_blank" rel="noreferrer" className="underline hover:text-green-800">View</a>
+                            </div>
+                        )}
+
+                        <button 
+                            onClick={() => { setShowTipInput(false); setTipAmount(""); }}
+                            className="w-full text-center text-xs text-[#A0522D] mt-2 hover:underline"
+                        >
+                            Cancel
+                        </button>
+                    </div>
+                )}
+            </div>
+          </>
         )}
       </div>
     </motion.div>
   );
 }
 
-// The rest of your component remains the same...
+// ... Rest of your Courses component remains exactly the same as you provided ...
 export default function Courses() {
   const { address } = useAccount();
   const { data: userData } = useUsers(address);

@@ -7,7 +7,8 @@ import {
   useAccount,
 } from "wagmi";
 import { CONTRACT_ABI, CONTRACT_ADDRESS } from "./contract";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useSmartSession } from "./useSmartSession";
 
 // Reuse existing interfaces and enums
 export enum UserRole {
@@ -398,7 +399,7 @@ export function useGetPastExamForRevision(examId: bigint | undefined) {
 
     const data = result.data as readonly [
       readonly string[], // questionTexts
-      readonly [string, string, string, string][] // questionOptions
+      readonly [string, string, string, string][], // questionOptions
     ];
 
     console.log("📦 Past Exam Data Received:", {
@@ -646,4 +647,40 @@ export function useTakeExam() {
     isConfirmed,
     error,
   };
+}
+
+export function useTipTutor() {
+  const { requestSession, executeTip, isReady } = useSmartSession();
+  const [tipHash, setTipHash] = useState<string | null>(null);
+  const [isPending, setIsPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const sendTip = async (tutorAddress: string, amount: string) => {
+    setIsPending(true);
+    setError(null);
+    setTipHash(null);
+
+    try {
+      // 1. Auto-Login if needed
+      if (!isReady) {
+        await requestSession();
+      }
+
+      // 2. Execute Tip with the USER PROVIDED amount
+      const hash = await executeTip(tutorAddress, amount);
+      setTipHash(hash);
+    } catch (err: any) {
+      console.error("Tip Failed:", err);
+      // Nice error handling for the limit
+      if (err.message?.includes("period limit")) {
+        setError("Daily spending limit reached. Please try a smaller amount.");
+      } else {
+        setError("Failed to send tip. See console for details.");
+      }
+    } finally {
+      setIsPending(false);
+    }
+  };
+
+  return { sendTip, tipHash, isPending, error };
 }

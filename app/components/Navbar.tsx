@@ -4,6 +4,7 @@ import { useAccount, useBalance } from "wagmi";
 import { useUsers } from "@/utils/useContractHooks";
 import { WalletConnect } from "./WalletConnect";
 import TranslationModal from "./TranslationDrawer";
+import SmartWalletIndicator from "./SmartWalletIndicator"; // 🟢 Import the new component
 import toast from "react-hot-toast";
 
 export default function Navbar() {
@@ -21,7 +22,6 @@ export default function Navbar() {
         return `${address.slice(0, 6)}...${address.slice(-4)}`;
     };
 
-
     const copyToClipboard = (text: string) => {
         navigator.clipboard.writeText(text).then(() => {
             toast.success('Address copied to clipboard!');
@@ -30,7 +30,6 @@ export default function Navbar() {
             console.error('Failed to copy: ', err);
         });
     };
-
 
     // Format balance from wei to ETH
     const formatBalance = (value: bigint, decimals: number) => {
@@ -58,7 +57,7 @@ export default function Navbar() {
                         <div className="flex-shrink-0">
                             <h1 className="text-2xl font-bold text-[#4E342E]">Proof</h1>
                             <p className="text-md text-[#8D6E63] capitalize">
-                                {getUserName()}  {" "} -  {getUserRole()}
+                                {getUserName()}   -  {getUserRole()}
                             </p>
                         </div>
                     </div>
@@ -74,6 +73,9 @@ export default function Navbar() {
                             <div className="flex items-center space-x-4">
                                 {/* Translation Modal */}
                                 <TranslationModal />
+
+                                {/* 🟢 NEW: Smart Session Wallet Indicator */}
+                                <SmartWalletIndicator />
 
                                 {/* Balance */}
                                 {balance && (
@@ -103,11 +105,6 @@ export default function Navbar() {
                         )}
                     </div>
                 </div>
-
-                {/* Remove the LocaleSwitcher section since we're using TranslationModal instead */}
-                {/* <div className="bg-black">
-                    <LocaleSwitcher locales={["en", "es"]} />
-                </div> */}
             </div>
         </nav>
     );
