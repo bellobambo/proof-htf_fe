@@ -16,10 +16,11 @@ import {
   useGetCourse,
   useCreateExam,
   useCourseEnrollments,
-  useTipTutor // <--- Ensure this is exported from your hooks file
 } from "@/utils/useContractHooks";
+
 import ExamTemplate from "./ExamTemplate";
 import { PlusCircleOutlined, DeleteOutlined, GiftOutlined } from "@ant-design/icons";
+import TipCard from "./TipCard";
 
 // Separate component for individual course to properly use hooks
 function CourseCard({
@@ -41,11 +42,10 @@ function CourseCard({
 }) {
   const { data: course, isLoading } = useGetCourse(courseId);
   const { data: isEnrolled } = useCourseEnrollments(courseId, userAddress);
-  
+
   // Tip State
-  const [showTipInput, setShowTipInput] = useState(true);
+  const [showTipInput, setShowTipInput] = useState(false);
   const [tipAmount, setTipAmount] = useState("");
-  const { sendTip, isPending: isTipping, tipHash, error: tipError } = useTipTutor();
 
   if (isLoading) {
     return (
@@ -72,14 +72,6 @@ function CourseCard({
     });
   };
 
-  const handleSendTip = async () => {
-    if (!tipAmount || parseFloat(tipAmount) <= 0) {
-        toast.error("Please enter a valid amount");
-        return;
-    }
-    await sendTip(course.tutor, tipAmount);
-    // Note: Success toast is handled in the hook, or you can add one here if hook doesn't have it
-  };
 
   return (
     <motion.div
@@ -88,7 +80,7 @@ function CourseCard({
       transition={{ delay: index * 0.1 }}
       className="bg-[#F5F5DC] p-6 rounded-xl border-2 border-[#8B4513] hover:border-[#A0522D] transition-colors shadow-sm flex flex-col h-full"
     >
-      <div className="flex-grow">
+      <div className="grow">
         <h3 className="text-xl font-semibold text-[#8B4513] mb-2">
           {course.title}
         </h3>
@@ -138,71 +130,15 @@ function CourseCard({
               whileTap={!isEnrolled ? { scale: 0.98 } : {}}
               onClick={() => onEnroll(course.courseId)}
               disabled={enrolling || isEnrolled}
-              className={`w-full py-2 cursor-pointer text-[#F5F5DC] rounded-lg transition-colors font-medium ${
-                isEnrolled
+              className={`w-full py-2 cursor-pointer text-[#F5F5DC] rounded-lg transition-colors font-medium ${isEnrolled
                   ? "bg-gray-400 cursor-not-allowed"
                   : "bg-[#654321] hover:bg-[#8B4513] disabled:opacity-50 disabled:cursor-not-allowed"
-              }`}
+                }`}
             >
               {enrolling ? "Enrolling..." : isEnrolled ? "Enrolled" : "Enroll in Course"}
             </motion.button>
 
-            {/* Tipping Section */}
-            <div className="pt-3 border-t border-[#D2B48C]">
-                {!showTipInput ? (
-                    <button 
-                        onClick={() => setShowTipInput(true)}
-                        className="w-full py-2 border border-[#8B4513] text-[#8B4513] rounded-lg hover:bg-[#FAF0E6] transition-colors text-sm font-medium flex items-center justify-center gap-2"
-                    >
-                        <GiftOutlined /> Tip Tutor
-                    </button>
-                ) : (
-                    <div className="bg-[#FAF0E6] p-3 rounded-lg border border-[#D2B48C]">
-                        <div className="text-xs text-[#8B4513] mb-2 font-medium">Send ETH to Tutor</div>
-                        <div className="flex gap-2">
-                            <div className="relative flex-grow">
-                                <span className="absolute left-2 top-1.5 text-[#8B4513] text-sm">Ξ</span>
-                                <input 
-                                    type="number" 
-                                    placeholder="0.001"
-                                    step="0.001"
-                                    value={tipAmount}
-                                    onChange={(e) => setTipAmount(e.target.value)}
-                                    className="w-full pl-5 pr-2 py-1.5 text-sm border border-[#D2B48C] rounded bg-white text-[#8B4513] focus:outline-none focus:border-[#8B4513]"
-                                />
-                            </div>
-                            <button 
-                                onClick={handleSendTip}
-                                disabled={isTipping || !tipAmount}
-                                className="bg-[#8B4513] text-[#F5F5DC] px-3 py-1.5 rounded text-sm font-medium hover:bg-[#654321] disabled:opacity-50"
-                            >
-                                {isTipping ? "..." : "Send"}
-                            </button>
-                        </div>
-                        
-                        {/* Error Message */}
-                        {tipError && (
-                            <div className="text-xs text-red-600 mt-2 leading-tight">
-                                {tipError.includes('period limit') ? "Daily limit reached" : "Failed to send"}
-                            </div>
-                        )}
 
-                        {/* Success Message / Hash Link */}
-                        {tipHash && (
-                            <div className="text-xs text-green-700 mt-2">
-                                ✅ Sent! <a href={`https://sepolia.etherscan.io/tx/${tipHash}`} target="_blank" rel="noreferrer" className="underline hover:text-green-800">View</a>
-                            </div>
-                        )}
-
-                        <button 
-                            onClick={() => { setShowTipInput(false); setTipAmount(""); }}
-                            className="w-full text-center text-xs text-[#A0522D] mt-2 hover:underline"
-                        >
-                            Cancel
-                        </button>
-                    </div>
-                )}
-            </div>
           </>
         )}
       </div>
@@ -394,6 +330,7 @@ export default function Courses() {
             <h1 className="text-3xl font-bold text-[#F5F5DC]">
               Welcome back, {userData?.name}!
             </h1>
+            <TipCard />
             <p className="text-[#F5F5DC] mt-2">
               {isTutor ? "Tutor Dashboard" : "Student Dashboard"}
             </p>

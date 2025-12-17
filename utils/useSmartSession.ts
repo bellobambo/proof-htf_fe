@@ -6,13 +6,15 @@ import {
   custom,
   createPublicClient,
   http,
-  encodeFunctionData,
   parseUnits,
   Hex,
 } from "viem";
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 import { sepolia } from "viem/chains";
-import { createBundlerClient } from "viem/account-abstraction";
+import {
+  createBundlerClient,
+  createPaymasterClient,
+} from "viem/account-abstraction";
 import {
   erc7715ProviderActions,
   erc7710BundlerActions,
@@ -21,203 +23,209 @@ import {
   toMetaMaskSmartAccount,
   Implementation,
 } from "@metamask/smart-accounts-kit";
-import { formatEther } from "viem";
-import { CONTRACT_ADDRESS } from "./contract";
 
 const BUNDLER_URL =
+  process.env.NEXT_PUBLIC_BUNDLER_URL ||
   "https://api.pimlico.io/v2/sepolia/rpc?apikey=pim_ebHNbdP8xTZAriphyLSKMD";
 
 export function useSmartSession() {
   const [session, setSession] = useState<any>(null);
   const [isReady, setIsReady] = useState(false);
+  const [userAddress, setUserAddress] = useState<string | null>(null);
+  const [smartAccountAddress, setSmartAccountAddress] = useState<string | null>(
+    null
+  );
 
-  // --- HELPER: Get (or create) the "Invisible Robot" (Local Key) ---
-  const getLocalSigner = () => {
+  const getLocalAccount = useCallback(() => {
     if (typeof window === "undefined") return null;
-
     let privKey = localStorage.getItem("session_private_key") as Hex;
-
     if (!privKey) {
       privKey = generatePrivateKey();
       localStorage.setItem("session_private_key", privKey);
     }
-
     return privateKeyToAccount(privKey);
-  };
+  }, []);
 
-  // --- HELPER: Connect to Smart Account ---
-  const getSmartAccount = async () => {
-    if (typeof window === "undefined" || !(window as any).ethereum) {
-      throw new Error("No wallet found");
-    }
-
+  const getSessionAccount = async () => {
     const publicClient = createPublicClient({
       chain: sepolia,
       transport: http(),
     });
+    const account = getLocalAccount();
+    if (!account) throw new Error("Could not load local account");
 
-    const localSigner = getLocalSigner();
-    if (!localSigner) throw new Error("Could not load local signer");
+    return await toMetaMaskSmartAccount({
+      client: publicClient,
+      implementation: Implementation.Hybrid,
+      deployParams: [account.address, [], [], []],
+      deploySalt: "0x",
+      signer: { account },
+    });
+  };
+
+  const updateSmartAccountAddress = async () => {
+    try {
+      const smartAccount = await getSessionAccount();
+      setSmartAccountAddress(smartAccount.address);
+    } catch (e) {
+      console.error("Failed to fetch smart account address", e);
+    }
+  };
+
+  const requestSession = async () => {
+    if (typeof window === "undefined") return;
 
     const walletClient = createWalletClient({
       chain: sepolia,
       transport: custom((window as any).ethereum),
-    });
-    const [ownerAddress] = await walletClient.requestAddresses();
-
-    return toMetaMaskSmartAccount({
-      client: publicClient,
-      implementation: Implementation.Hybrid,
-      deployParams: [ownerAddress, [], [], []],
-      deploySalt: "0x",
-      signer: { account: localSigner } as any,
-    });
-  };
-
-  // --- 1. Login / Request Permissions ---
-  const requestSession = async () => {
-    const baseClient = createWalletClient({
-      chain: sepolia,
-      transport: custom((window as any).ethereum),
     }).extend(erc7715ProviderActions());
 
-    // 1. Get the Robot
-    const localSigner = getLocalSigner();
-    if (!localSigner) throw new Error("No local signer found");
+    const [address] = await walletClient.requestAddresses();
+    setUserAddress(address);
 
-    // 2. Get the Smart Account (just to get its address for the context)
-    const sessionAccount = await getSmartAccount();
+    const sessionAccount = await getSessionAccount();
 
-    console.log("Requesting 7715 Permissions...");
-
-    const response = await baseClient.requestExecutionPermissions([
-      {
-        chainId: sepolia.id,
-        expiry: Math.floor(Date.now() / 1000) + 86400, // 24 hours
-        signer: {
-          type: "account",
-          // 🟢 FIX: Authorize the ROBOT address, NOT the Smart Account address
-          data: { address: localSigner.address },
-        },
-        permission: {
-          type: "native-token-periodic",
-          data: {
-            periodAmount: parseUnits("0.1", 18),
-            periodDuration: 86400,
+    try {
+      const response = await walletClient.requestExecutionPermissions([
+        {
+          chainId: sepolia.id,
+          expiry: Math.floor(Date.now() / 1000) + 86400,
+          signer: {
+            type: "account",
+            data: { address: sessionAccount.address },
           },
+          permission: {
+            type: "native-token-periodic",
+            data: {
+              periodAmount: parseUnits("0.1", 18),
+              periodDuration: 86400,
+              justification:
+                "Allow the robot to send tips on your behalf (Up to 0.1 ETH/day)",
+            },
+          },
+          isAdjustmentAllowed: true,
         },
-        isAdjustmentAllowed: true,
-      },
-    ]);
+      ]);
 
-    const sessionData = {
-      permissionContext: response[0],
-      accountAddress: sessionAccount.address,
-    };
+      const sessionData = {
+        permissionContext: response[0],
+        userAddress: address,
+        expiry: Math.floor(Date.now() / 1000) + 86400,
+      };
 
-    // Save "Version 4" to force a fresh login with the correct signer authorization
-    localStorage.setItem(
-      "smartSession_v4",
-      JSON.stringify(sessionData, (key, value) =>
-        typeof value === "bigint" ? value.toString() : value
-      )
-    );
-    setSession(sessionData);
-    setIsReady(true);
-
-    return sessionData;
+      localStorage.setItem("smartSession_v5", JSON.stringify(sessionData));
+      setSession(sessionData);
+      setIsReady(true);
+      setSmartAccountAddress(sessionAccount.address);
+      return sessionData;
+    } catch (error) {
+      console.error("Permission request failed:", error);
+      throw error;
+    }
   };
 
   const executeTip = useCallback(
     async (recipientAddress: string, amountEther: string) => {
-      const currentSession = session;
-      if (!currentSession) throw new Error("No active session");
+      let currentSession = session;
+      if (!currentSession && typeof window !== "undefined") {
+        const stored = localStorage.getItem("smartSession_v5");
+        if (stored) currentSession = JSON.parse(stored);
+      }
 
-      const bundlerClient = createBundlerClient({
-        chain: sepolia,
-        transport: http(BUNDLER_URL),
-        // paymaster: true, // Keep commented out (User pays gas)
-      }).extend(erc7710BundlerActions());
+      if (!currentSession) throw new Error("No active session.");
 
       const publicClient = createPublicClient({
         chain: sepolia,
         transport: http(),
       });
 
-      const smartAccount = await getSmartAccount();
+      const pimlicoUrl =
+        "https://api.pimlico.io/v2/sepolia/rpc?apikey=pim_ebHNbdP8xTZAriphyLSKMD";
 
-      // 1. Get Balance
-      const balance = await publicClient.getBalance({
-        address: smartAccount.address,
+      // 1. Create Paymaster Client
+      const paymasterClient = createPaymasterClient({
+        transport: http(pimlicoUrl),
       });
 
-      // 🟢 FIX: Use formatEther to see decimals properly
-      console.log("🤖 ROBOT ADDRESS:", smartAccount.address);
-      console.log("💰 ROBOT BALANCE:", formatEther(balance), "ETH");
+      // 2. Create Bundler Client
+      const bundlerClient = createBundlerClient({
+        chain: sepolia,
+        transport: http(pimlicoUrl),
+        paymaster: paymasterClient,
+      }).extend(erc7710BundlerActions());
 
-      const requiredAmount = parseUnits(amountEther, 18);
+      const sessionAccount = await getSessionAccount();
+      const { context, signerMeta } = currentSession.permissionContext;
 
-      // 2. Safety Check (Tip Amount only)
-      if (balance < requiredAmount) {
-        throw new Error(
-          `Not enough ETH to send tip. Have: ${formatEther(balance)}, Need: ${amountEther}`
-        );
-      }
+      // 🟢 CRITICAL FIX: Fetch gas prices from Pimlico directly
+      const gasPriceResponse = await fetch(pimlicoUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          method: "pimlico_getUserOperationGasPrice",
+          params: [],
+          id: 1,
+        }),
+      });
 
-      // 3. Gas Warning (Heuristic)
-      // A UserOp typically costs ~0.0005 ETH on testnets depending on gas price
-      const ESTIMATED_GAS_COST = parseUnits("0.0005", 18);
-      if (balance < requiredAmount + ESTIMATED_GAS_COST) {
-        console.warn("⚠️ Warning: Balance might be too low to cover Gas + Tip");
-      }
-
-      console.log(`Sending Tip: ${amountEther} ETH...`);
+      const gasPriceData = await gasPriceResponse.json();
+      const { fast } = gasPriceData.result;
 
       const userOpHash = await bundlerClient.sendUserOperationWithDelegation({
         publicClient,
-        account: smartAccount,
+        account: sessionAccount,
+        maxFeePerGas: BigInt(fast.maxFeePerGas),
+        maxPriorityFeePerGas: BigInt(fast.maxPriorityFeePerGas),
         calls: [
           {
             to: recipientAddress as `0x${string}`,
-            value: requiredAmount,
+            value: parseUnits(amountEther, 18),
             data: "0x",
-            permissionsContext: currentSession.permissionContext.context,
-            delegationManager:
-              currentSession.permissionContext.signerMeta.delegationManager,
+            permissionsContext: context,
+            delegationManager: signerMeta.delegationManager,
           },
         ],
-        maxFeePerGas: BigInt(2000000000), // 2 Gwei
-        maxPriorityFeePerGas: BigInt(2000000000),
       });
-
-      console.log("UserOp Sent! Hash:", userOpHash);
 
       const receipt = await bundlerClient.waitForUserOperationReceipt({
         hash: userOpHash,
       });
-
       return receipt.receipt.transactionHash;
     },
     [session]
   );
 
-  const executeSmartAction = useCallback(async () => {
-    return null;
+  const clearSession = useCallback(() => {
+    localStorage.removeItem("smartSession_v5");
+    setSession(null);
+    setIsReady(false);
+    setUserAddress(null);
   }, []);
 
   useEffect(() => {
-    const saved = localStorage.getItem("smartSession_v4");
-    if (saved) {
-      setSession(JSON.parse(saved));
-      setIsReady(true);
+    if (typeof window !== "undefined") {
+      updateSmartAccountAddress();
+      const saved = localStorage.getItem("smartSession_v5");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.expiry && parsed.expiry < Date.now() / 1000) {
+          clearSession();
+        } else {
+          setSession(parsed);
+          setUserAddress(parsed.userAddress);
+          setIsReady(true);
+        }
+      }
     }
-  }, []);
+  }, [clearSession]);
 
   return {
     requestSession,
-    executeSmartAction,
     executeTip,
+    clearSmartAccountCache: clearSession,
     isReady,
-    smartAccountAddress: session?.accountAddress,
+    userAddress,
+    smartAccountAddress,
   };
 }

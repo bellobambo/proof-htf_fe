@@ -649,38 +649,4 @@ export function useTakeExam() {
   };
 }
 
-export function useTipTutor() {
-  const { requestSession, executeTip, isReady } = useSmartSession();
-  const [tipHash, setTipHash] = useState<string | null>(null);
-  const [isPending, setIsPending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
-  const sendTip = async (tutorAddress: string, amount: string) => {
-    setIsPending(true);
-    setError(null);
-    setTipHash(null);
-
-    try {
-      // 1. Auto-Login if needed
-      if (!isReady) {
-        await requestSession();
-      }
-
-      // 2. Execute Tip with the USER PROVIDED amount
-      const hash = await executeTip(tutorAddress, amount);
-      setTipHash(hash);
-    } catch (err: any) {
-      console.error("Tip Failed:", err);
-      // Nice error handling for the limit
-      if (err.message?.includes("period limit")) {
-        setError("Daily spending limit reached. Please try a smaller amount.");
-      } else {
-        setError("Failed to send tip. See console for details.");
-      }
-    } finally {
-      setIsPending(false);
-    }
-  };
-
-  return { sendTip, tipHash, isPending, error };
-}

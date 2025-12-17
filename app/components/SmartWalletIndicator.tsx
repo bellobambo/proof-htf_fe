@@ -1,88 +1,78 @@
 "use client";
 
 import { useState } from "react";
-import { useBalance } from "wagmi"; // 🟢 Import useBalance
+import { useBalance } from "wagmi";
 import { sepolia } from "viem/chains";
-import { CopyOutlined, RobotOutlined, WalletOutlined } from "@ant-design/icons";
+import { formatEther } from "viem";
+import { RobotOutlined, CopyOutlined, WalletOutlined, ReloadOutlined, PlusCircleOutlined } from "@ant-design/icons";
 import { toast } from "react-hot-toast";
-import { useSmartSession } from "@/utils/useSmartSession";
+import { useSmartAccount } from "./SmartSessionContext";
+// import { useSmartAccount } from "@/context/SmartSessionContext";
+
 
 export default function SmartWalletIndicator() {
-  const { smartAccountAddress, isReady } = useSmartSession();
-  const [isHovered, setIsHovered] = useState(false);
+  const { smartAccountAddress, isReady, requestSession, clearSmartAccountCache } = useSmartAccount();
+  const [isCreating, setIsCreating] = useState(false);
 
-  // 🟢 Fetch Balance for the Smart Account
   const { data: balance } = useBalance({
     address: smartAccountAddress as `0x${string}`,
     chainId: sepolia.id,
-    query: {
-      enabled: !!smartAccountAddress, // Only fetch if address exists
-      refetchInterval: 10000, // Refresh every 10 seconds
-    }
+    query: { enabled: !!smartAccountAddress, refetchInterval: 5000 }
   });
 
-  if (!smartAccountAddress) return null;
+  const formattedBalance = balance ? Number(formatEther(balance.value)).toFixed(4) : "0.0000";
 
-  const handleCopy = () => {
-    navigator.clipboard.writeText(smartAccountAddress);
-    toast.success("Address copied! Send ETH here to top up.");
-  };
+  if (!smartAccountAddress) return <div className="h-10 w-32 animate-pulse bg-stone-200 rounded-lg" />;
 
-  // Helper to format ETH nicely
-  const formattedBalance = balance 
-    ? (Number(balance.value) / Math.pow(10, balance.decimals)).toFixed(4)
-    : "0.0000";
+  if (!isReady) {
+    return (
+      <button
+        onClick={async () => {
+          try {
+            setIsCreating(true);
+            await requestSession();
+            toast.success("Wallet Authorized!");
+          } catch (e) {
+            toast.error("Authorization failed");
+          } finally {
+            setIsCreating(false);
+          }
+        }}
+        className="flex items-center gap-2 bg-[#8B4513] text-[#F5F5DC] px-4 py-1.5 rounded-lg border-2 border-[#5D4037] hover:bg-[#6D4C41] transition-all font-semibold text-sm shadow-sm"
+      >
+        <PlusCircleOutlined spin={isCreating} />
+        <span>{isCreating ? "Connecting..." : "Enable Tipping"}</span>
+      </button>
+    );
+  }
 
   return (
-    <div 
-      className="flex items-center gap-3 bg-[#F5F5DC] border-2 border-[#8B4513] rounded-lg px-3 py-1.5 cursor-pointer hover:bg-[#E8E8D0] transition-colors"
-      onClick={handleCopy}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
-      title="This is your Session Wallet (Robot). Click to copy address."
-    >
-      <div className="flex items-center gap-2">
-        {/* Status Icon */}
-        <div className={`p-1.5 rounded-full flex items-center justify-center ${
-            isReady && Number(formattedBalance) > 0 
-            ? 'bg-green-100 text-green-700' 
-            : 'bg-yellow-100 text-yellow-700'
-        }`}>
-            <RobotOutlined />
+    <div className="flex items-center gap-2">
+      <div 
+        className="flex items-center gap-3 bg-[#F5F5DC] border-2 border-[#8B4513] rounded-lg px-3 py-1.5 cursor-pointer hover:bg-[#E8E8D0] transition-colors"
+        onClick={() => {
+          navigator.clipboard.writeText(smartAccountAddress);
+          toast.success("Address copied!");
+        }}
+      >
+        <div className={`p-1.5 rounded-full ${Number(formattedBalance) > 0 ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
+          <RobotOutlined />
         </div>
-        
-        {/* Wallet Details */}
         <div className="flex flex-col">
-          <div className="flex items-center justify-between gap-2">
-            <span className="text-[10px] font-bold text-[#8B4513] uppercase tracking-wider leading-none">
-                Session Wallet
-            </span>
-          </div>
-          
+          <span className="text-[10px] font-bold text-[#8B4513] uppercase leading-none">Session Wallet</span>
           <div className="flex items-center gap-2 mt-0.5">
-            {/* Address */}
-            <span className="text-xs font-mono text-[#8D6E63]">
-                {smartAccountAddress.slice(0, 5)}...{smartAccountAddress.slice(-4)}
-            </span>
-            
-            {/* Separator dot */}
-            <div className="w-1 h-1 bg-[#D2B48C] rounded-full"></div>
-
-            {/* 🟢 Balance Display */}
-            <span className={`text-xs font-bold font-mono ${
-                Number(formattedBalance) === 0 ? 'text-red-500' : 'text-[#5D4037]'
-            }`}>
-                {formattedBalance} ETH
-            </span>
+            <span className="text-xs font-mono text-[#8D6E63]">{smartAccountAddress.slice(0, 4)}...{smartAccountAddress.slice(-4)}</span>
+            <span className="text-xs font-bold font-mono text-[#5D4037]">{formattedBalance} ETH</span>
           </div>
         </div>
+        <WalletOutlined className="text-[#8B4513]" />
       </div>
-
-      <div className="h-8 w-[1px] bg-[#D2B48C] mx-1"></div>
-
-      <div className="text-[#8B4513] text-lg">
-        {isHovered ? <CopyOutlined /> : <WalletOutlined />}
-      </div>
+      <button 
+        onClick={() => confirm("Reset wallet?") && clearSmartAccountCache()}
+        className="p-2 bg-red-50 text-red-600 border border-red-200 rounded-lg hover:bg-red-100"
+      >
+        <ReloadOutlined />
+      </button>
     </div>
   );
 }
