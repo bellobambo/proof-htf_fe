@@ -176,7 +176,7 @@ function CourseCard({
                 disabled={enrolling}
                 className="w-full py-2.5 cursor-pointer text-[#F5F5DC] bg-[#654321] hover:bg-[#4a3118] disabled:bg-[#8B4513]/50 rounded-lg transition-all font-bold text-sm shadow-sm"
               >
-                {enrolling ? "Processing..." : "Enroll Now"}
+                {enrolling ? "Processing..." : "Enroll In Course"}
               </button>
             )}
 
@@ -191,8 +191,8 @@ function CourseCard({
                     >
                       <LockOutlined /> Support Locked
                     </button>
-                    <p className="text-[10px] text-center text-[#8B4513] mt-1 font-medium italic">
-                      Enable "Tipping" in dashboard to support
+                    <p className="text-[13px] text-center text-[#8B4513] mt-1 font-medium italic">
+                      Enable "Tipping" in Navbar to Support Tutor
                     </p>
                   </div>
                 ) : !showTipInput ? (
