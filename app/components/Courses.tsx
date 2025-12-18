@@ -19,10 +19,13 @@ import {
 } from "@/utils/useContractHooks";
 
 import ExamTemplate from "./ExamTemplate";
-import { PlusCircleOutlined, DeleteOutlined, GiftOutlined } from "@ant-design/icons";
+import { PlusCircleOutlined, DeleteOutlined, GiftOutlined, CloseOutlined, CopyOutlined } from "@ant-design/icons";
 import TipCard from "./TipCard";
+import { useSmartSession } from "@/utils/useSmartSession";
 
-// Separate component for individual course to properly use hooks
+
+
+
 function CourseCard({
   courseId,
   index,
@@ -42,109 +45,187 @@ function CourseCard({
 }) {
   const { data: course, isLoading } = useGetCourse(courseId);
   const { data: isEnrolled } = useCourseEnrollments(courseId, userAddress);
+  const { executeTip, isReady } = useSmartSession();
 
-  // Tip State
   const [showTipInput, setShowTipInput] = useState(false);
   const [tipAmount, setTipAmount] = useState("");
+  const [isTipping, setIsTipping] = useState(false);
 
-  if (isLoading) {
-    return (
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: index * 0.1 }}
-        className="bg-[#F5F5DC] p-6 rounded-xl border-2 border-[#8B4513]"
-      >
-        <div className="text-[#8B4513]">Loading course...</div>
-      </motion.div>
-    );
-  }
+  if (isLoading) return <div className="bg-[#F5F5DC] p-6 rounded-xl border-2 border-[#8B4513] animate-pulse h-64" />;
+  if (!course || !course.isActive) return null;
 
-  if (!course || !course.isActive) {
-    return null;
-  }
+  const handleDirectTip = async () => {
+    if (!isReady) {
+      toast.error("Enable 'Smart Tipping' in dashboard first!");
+      return;
+    }
+    if (!tipAmount || parseFloat(tipAmount) <= 0) {
+      toast.error("Invalid amount");
+      return;
+    }
 
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text).then(() => {
-      toast.success('Address copied to clipboard!');
-    }).catch((err) => {
-      toast.error('Failed to copy address');
-    });
+    try {
+      setIsTipping(true);
+      toast.loading(`Tipping ${course.tutorName}...`, { id: "tip-loading" });
+      const txHash = await executeTip(course.tutor, tipAmount);
+      toast.success(`Sent ${tipAmount} ETH to ${course.tutorName}`, { id: "tip-loading" });
+
+      toast(
+        (t) => (
+          <span className="flex items-center gap-2">
+            Tx: {txHash.slice(0, 8)}...
+            <button
+              onClick={() => {
+                navigator.clipboard.writeText(txHash);
+                toast.success("Hash copied!", { id: "copy-success" });
+              }}
+              className="ml-2 px-2 py-1 bg-[#8B4513] text-[#F5F5DC] text-[10px] rounded font-bold hover:bg-[#654321] transition-colors"
+            >
+              Copy
+            </button>
+          </span>
+        ),
+        {
+          icon: '🔗',
+          duration: 6000 
+        }
+      );
+
+      setShowTipInput(false);
+      setTipAmount("");
+    } catch (err: any) {
+      toast.error("Tip failed. Check gas.", { id: "tip-loading" });
+    } finally {
+      setIsTipping(false);
+    }
   };
-
 
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: index * 0.1 }}
-      className="bg-[#F5F5DC] p-6 rounded-xl border-2 border-[#8B4513] hover:border-[#A0522D] transition-colors shadow-sm flex flex-col h-full"
+      className="bg-[#F5F5DC] p-5 rounded-xl border-2 border-[#8B4513] hover:shadow-md transition-all flex flex-col h-full relative overflow-hidden"
     >
       <div className="grow">
-        <h3 className="text-xl font-semibold text-[#8B4513] mb-2">
-          {course.title}
-        </h3>
-        <p className="text-[#A0522D] mb-2">Tutor: {course.tutorName}</p>
-        <p
-          className="text-[#CD853F] text-sm mb-3 font-mono cursor-pointer hover:text-[#A0522D] transition-colors"
-          onClick={() => copyToClipboard(course.tutor)}
-          title="Click to copy tutor address"
-        >
-          {`${course.tutor.slice(0, 6)}...${course.tutor.slice(-4)}`}
-        </p>
+        <h3 className="text-lg font-bold text-[#8B4513] leading-tight mb-1">{course.title}</h3>
+        <p className="text-[#A0522D] text-sm font-medium mb-1">by {course.tutorName}</p>
 
-        <div className="flex items-center gap-2 mb-4">
-          <div className="inline-block px-3 py-1 rounded-full text-sm bg-[#FAF0E6] border border-[#8B4513] text-[#8B4513] font-medium">
+        {/* Tutor Wallet Section */}
+        <div className="flex items-center gap-1.5 mb-3">
+          <span className="text-[12px] text-[#8B4513]/60 font-semibold bg-[#8B4513]/5 px-1.5 py-1 rounded border border-[#8B4513]/10">
+            {`${course.tutor.slice(0, 6)}...${course.tutor.slice(-4)}`}
+          </span>
+          <button
+            onClick={() => {
+              navigator.clipboard.writeText(course.tutor);
+              toast.success("Address copied!");
+            }}
+            className="text-[#8B4513]/60 hover:text-[#8B4513] transition-colors"
+          >
+            <CopyOutlined style={{ fontSize: '13px', cursor: "pointer" }} />
+          </button>
+        </div>
+
+        <div className="flex gap-2 mb-4">
+          <span className="px-2 py-0.5 rounded-md text-[10px] bg-[#FAF0E6] border border-[#8B4513] text-[#8B4513] font-bold uppercase">
             Active
-          </div>
-
-          {/* Enrollment status badge for students */}
+          </span>
           {!isTutor && isEnrolled && (
-            <div className="inline-block px-3 py-1 rounded-full text-sm bg-green-100 border border-green-600 text-green-700 font-medium">
+            <span className="px-2 py-0.5 rounded-md text-[10px] bg-green-100 border border-green-600 text-green-700 font-bold uppercase">
               Enrolled
-            </div>
+            </span>
           )}
         </div>
       </div>
 
-      {/* Buttons container */}
-      <div className="space-y-3 mt-4">
-        {/* Create Exam button for tutors */}
-        {isTutor && (
-          <motion.button
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
+      <div className="mt-auto space-y-3">
+        {isTutor ? (
+          <button
             onClick={() => onCreateExam(course)}
-            className="w-full py-2 cursor-pointer bg-[#8B4513] text-[#F5F5DC] rounded-lg hover:bg-[#A0522D] transition-colors font-medium"
+            className="w-full py-2 bg-[#8B4513] text-[#F5F5DC] rounded-lg hover:bg-[#A0522D] transition-colors font-bold text-sm"
           >
-            Create Exam
-          </motion.button>
-        )}
-
-        {/* Student Actions */}
-        {!isTutor && (
-          <>
-            {/* Enroll Button */}
-            <motion.button
-              whileHover={!isEnrolled ? { scale: 1.02 } : {}}
-              whileTap={!isEnrolled ? { scale: 0.98 } : {}}
+            Manage Exam
+          </button>
+        ) : (
+          <div className="flex flex-col gap-3">
+            <button
               onClick={() => onEnroll(course.courseId)}
               disabled={enrolling || isEnrolled}
-              className={`w-full py-2 cursor-pointer text-[#F5F5DC] rounded-lg transition-colors font-medium ${isEnrolled
-                  ? "bg-gray-400 cursor-not-allowed"
-                  : "bg-[#654321] hover:bg-[#8B4513] disabled:opacity-50 disabled:cursor-not-allowed"
+              className={`w-full py-2.5 text-[#F5F5DC] rounded-lg transition-all font-bold text-sm shadow-sm ${isEnrolled ? "bg-gray-400" : "bg-[#654321] hover:bg-[#4a3118]"
                 }`}
             >
-              {enrolling ? "Enrolling..." : isEnrolled ? "Enrolled" : "Enroll in Course"}
-            </motion.button>
+              {enrolling ? "..." : isEnrolled ? "Enrolled" : "Enroll Now"}
+            </button>
 
+            {/* Expanded Tipping Section */}
+            <div className="relative pt-2 border-t border-[#8B4513]/10">
+              {!showTipInput ? (
+                <button
+                  onClick={() => setShowTipInput(true)}
+                  className="w-full py-2.5 text-[#8B4513] bg-[#FAF0E6] border cursor-pointer border-[#D2B48C] hover:bg-[#F5F5DC] rounded-lg transition-all text-[14px] font-bold flex items-center justify-center gap-2"
+                >
+                  <GiftOutlined /> Support the Tutor
+                </button>
+              ) : (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  className="bg-white p-3 rounded-lg border-2 border-[#D2B48C] shadow-inner space-y-3"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold text-[#8B4513] uppercase tracking-wider">Set Tip Amount</span>
+                    <button
+                      onClick={() => setShowTipInput(false)}
+                      className="text-gray-400 hover:text-red-500 transition-colors"
+                    >
+                      <CloseOutlined style={{ fontSize: '12px' }} />
+                    </button>
+                  </div>
 
-          </>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      step="0.001"
+                      value={tipAmount}
+                      onChange={(e) => setTipAmount(e.target.value)}
+                      className="flex-1 min-w-0 px-3 py-2 text-sm rounded border-2 border-[#FAF0E6] focus:border-[#8B4513] outline-none bg-[#FAF0E6]/30 text-black font-mono font-bold"
+                      placeholder="0.01"
+                    />
+                    <button
+                      onClick={handleDirectTip}
+                      disabled={isTipping || !tipAmount}
+                      className="px-4 py-2 bg-[#8B4513] text-[#F5F5DC] text-xs rounded-md font-bold hover:bg-[#654321] disabled:opacity-50 shadow-sm"
+                    >
+                      {isTipping ? "..." : "SEND"}
+                    </button>
+                  </div>
+
+                  {/* Quick select pills - Slightly Larger */}
+                  <div className="flex gap-1.5 overflow-x-auto pb-1 no-scrollbar">
+                    {["0.001", "0.005", "0.01", "0.05"].map((val) => (
+                      <button
+                        key={val}
+                        onClick={() => setTipAmount(val)}
+                        className={`flex-1 min-w-[50px] text-[10px] py-1 rounded-md border-2 transition-all font-bold ${tipAmount === val
+                            ? "bg-[#8B4513] text-white border-[#8B4513]"
+                            : "bg-white border-[#FAF0E6] text-[#8B4513] hover:border-[#D2B48C]"
+                          }`}
+                      >
+                        {val}
+                      </button>
+                    ))}
+                  </div>
+                </motion.div>
+              )}
+            </div>
+          </div>
         )}
       </div>
     </motion.div>
   );
 }
+
 
 // ... Rest of your Courses component remains exactly the same as you provided ...
 export default function Courses() {
@@ -330,7 +411,7 @@ export default function Courses() {
             <h1 className="text-3xl font-bold text-[#F5F5DC]">
               Welcome back, {userData?.name}!
             </h1>
-            <TipCard />
+            {/* <TipCard /> */}
             <p className="text-[#F5F5DC] mt-2">
               {isTutor ? "Tutor Dashboard" : "Student Dashboard"}
             </p>
@@ -576,7 +657,7 @@ export default function Courses() {
                     <div className="space-y-2 mb-3">
                       {question.options.map((option, optIndex) => (
                         <div key={optIndex} className="flex items-center gap-2">
-                          <span className="text-sm font-medium text-[#8B4513] min-w-[80px]">
+                          <span className="text-sm font-medium text-[#8B4513] min-w-20">
                             {String.fromCharCode(97 + optIndex)})
                           </span>
                           <input
