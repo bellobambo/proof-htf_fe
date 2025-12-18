@@ -24,10 +24,6 @@ import {
   Implementation,
 } from "@metamask/smart-accounts-kit";
 
-const BUNDLER_URL =
-  process.env.NEXT_PUBLIC_BUNDLER_URL ||
-  "https://api.pimlico.io/v2/sepolia/rpc?apikey=pim_ebHNbdP8xTZAriphyLSKMD";
-
 export function useSmartSession() {
   const [session, setSession] = useState<any>(null);
   const [isReady, setIsReady] = useState(false);
@@ -97,10 +93,9 @@ export function useSmartSession() {
           permission: {
             type: "native-token-periodic",
             data: {
-              periodAmount: parseUnits("0.1", 18),
+              periodAmount: parseUnits("0.01", 18),
               periodDuration: 86400,
-              justification:
-                "Allow the robot to send tips on your behalf (Up to 0.1 ETH/day)",
+              justification: "Tip Tutor up to 0.01 ETH per day",
             },
           },
           isAdjustmentAllowed: true,
@@ -139,9 +134,7 @@ export function useSmartSession() {
         transport: http(),
       });
 
-      const pimlicoUrl =
-        "https://api.pimlico.io/v2/sepolia/rpc?apikey=pim_ebHNbdP8xTZAriphyLSKMD";
-
+      const pimlicoUrl = process.env.NEXT_PUBLIC_BUNDLER_URL;
       // 1. Create Paymaster Client
       const paymasterClient = createPaymasterClient({
         transport: http(pimlicoUrl),
@@ -158,7 +151,7 @@ export function useSmartSession() {
       const { context, signerMeta } = currentSession.permissionContext;
 
       // 🟢 CRITICAL FIX: Fetch gas prices from Pimlico directly
-      const gasPriceResponse = await fetch(pimlicoUrl, {
+      const gasPriceResponse = await fetch(pimlicoUrl!, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

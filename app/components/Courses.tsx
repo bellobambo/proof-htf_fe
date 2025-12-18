@@ -19,7 +19,7 @@ import {
 } from "@/utils/useContractHooks";
 
 import ExamTemplate from "./ExamTemplate";
-import { PlusCircleOutlined, DeleteOutlined, GiftOutlined, CloseOutlined, CopyOutlined } from "@ant-design/icons";
+import { PlusCircleOutlined, DeleteOutlined, GiftOutlined, CloseOutlined, CopyOutlined, LockOutlined, UnlockOutlined } from "@ant-design/icons";
 import TipCard from "./TipCard";
 import { useSmartSession } from "@/utils/useSmartSession";
 
@@ -72,22 +72,34 @@ function CourseCard({
 
       toast(
         (t) => (
-          <span className="flex items-center gap-2">
-            Tx: {txHash.slice(0, 8)}...
-            <button
-              onClick={() => {
-                navigator.clipboard.writeText(txHash);
-                toast.success("Hash copied!", { id: "copy-success" });
-              }}
-              className="ml-2 px-2 py-1 bg-[#8B4513] text-[#F5F5DC] text-[10px] rounded font-bold hover:bg-[#654321] transition-colors"
-            >
-              Copy
-            </button>
-          </span>
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center justify-between gap-4">
+              <a
+                href={`https://sepolia.etherscan.io/tx/${txHash}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[#8B4513] font-bold text-xs underline hover:text-[#654321] transition-colors"
+              >
+                View on Etherscan 🔗
+              </a>
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(txHash);
+                  toast.success("Hash copied!", { id: "copy-success" });
+                }}
+                className="px-2 py-1 bg-[#8B4513] text-[#F5F5DC] text-[10px] rounded font-bold hover:bg-[#654321] transition-colors"
+              >
+                Copy Hash
+              </button>
+            </div>
+            <span className="text-[10px] text-gray-500 font-mono truncate max-w-[200px]">
+              {txHash}
+            </span>
+          </div>
         ),
         {
-          icon: '🔗',
-          duration: 6000 
+          icon: '✅',
+          duration: 8000
         }
       );
 
@@ -95,6 +107,7 @@ function CourseCard({
       setTipAmount("");
     } catch (err: any) {
       toast.error("Tip failed. Check gas.", { id: "tip-loading" });
+      console.log(err)
     } finally {
       setIsTipping(false);
     }
@@ -108,8 +121,12 @@ function CourseCard({
       className="bg-[#F5F5DC] p-5 rounded-xl border-2 border-[#8B4513] hover:shadow-md transition-all flex flex-col h-full relative overflow-hidden"
     >
       <div className="grow">
-        <h3 className="text-lg font-bold text-[#8B4513] leading-tight mb-1">{course.title}</h3>
-        <p className="text-[#A0522D] text-sm font-medium mb-1">by {course.tutorName}</p>
+        <h3 className="text-lg font-bold text-[#8B4513] leading-tight mb-1">
+          {course.title}
+        </h3>
+        <p className="text-[#A0522D] text-sm font-medium mb-1">
+          by {course.tutorName}
+        </p>
 
         {/* Tutor Wallet Section */}
         <div className="flex items-center gap-1.5 mb-3">
@@ -123,7 +140,7 @@ function CourseCard({
             }}
             className="text-[#8B4513]/60 hover:text-[#8B4513] transition-colors"
           >
-            <CopyOutlined style={{ fontSize: '13px', cursor: "pointer" }} />
+            <CopyOutlined style={{ fontSize: "13px", cursor: "pointer" }} />
           </button>
         </div>
 
@@ -149,76 +166,97 @@ function CourseCard({
           </button>
         ) : (
           <div className="flex flex-col gap-3">
-            <button
-              onClick={() => onEnroll(course.courseId)}
-              disabled={enrolling || isEnrolled}
-              className={`w-full py-2.5 text-[#F5F5DC] rounded-lg transition-all font-bold text-sm shadow-sm ${isEnrolled ? "bg-gray-400" : "bg-[#654321] hover:bg-[#4a3118]"
-                }`}
-            >
-              {enrolling ? "..." : isEnrolled ? "Enrolled" : "Enroll Now"}
-            </button>
+            {/* Enrollment Button: 
+          Only renders if NOT enrolled. 
+          When enrolled, this button disappears entirely.
+      */}
+            {!isEnrolled && (
+              <button
+                onClick={() => onEnroll(course.courseId)}
+                disabled={enrolling}
+                className="w-full py-2.5 cursor-pointer text-[#F5F5DC] bg-[#654321] hover:bg-[#4a3118] disabled:bg-[#8B4513]/50 rounded-lg transition-all font-bold text-sm shadow-sm"
+              >
+                {enrolling ? "Processing..." : "Enroll Now"}
+              </button>
+            )}
 
-            {/* Expanded Tipping Section */}
-            <div className="relative pt-2 border-t border-[#8B4513]/10">
-              {!showTipInput ? (
-                <button
-                  onClick={() => setShowTipInput(true)}
-                  className="w-full py-2.5 text-[#8B4513] bg-[#FAF0E6] border cursor-pointer border-[#D2B48C] hover:bg-[#F5F5DC] rounded-lg transition-all text-[14px] font-bold flex items-center justify-center gap-2"
-                >
-                  <GiftOutlined /> Support the Tutor
-                </button>
-              ) : (
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.95 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  className="bg-white p-3 rounded-lg border-2 border-[#D2B48C] shadow-inner space-y-3"
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-bold text-[#8B4513] uppercase tracking-wider">Set Tip Amount</span>
+            {/* Tipping Section - Only renders if student is enrolled */}
+            {isEnrolled && (
+              <div className="relative pt-2 border-t border-[#8B4513]/10">
+                {!isReady ? (
+                  <div className="group relative">
                     <button
-                      onClick={() => setShowTipInput(false)}
-                      className="text-gray-400 hover:text-red-500 transition-colors"
+                      disabled
+                      className="w-full py-2.5 text-gray-400 bg-gray-100 border border-gray-200 rounded-lg transition-all text-[14px] font-bold flex items-center justify-center gap-2 cursor-not-allowed"
                     >
-                      <CloseOutlined style={{ fontSize: '12px' }} />
+                      <LockOutlined /> Support Locked
                     </button>
+                    <p className="text-[10px] text-center text-[#8B4513] mt-1 font-medium italic">
+                      Enable "Tipping" in dashboard to support
+                    </p>
                   </div>
-
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="number"
-                      step="0.001"
-                      value={tipAmount}
-                      onChange={(e) => setTipAmount(e.target.value)}
-                      className="flex-1 min-w-0 px-3 py-2 text-sm rounded border-2 border-[#FAF0E6] focus:border-[#8B4513] outline-none bg-[#FAF0E6]/30 text-black font-mono font-bold"
-                      placeholder="0.01"
-                    />
-                    <button
-                      onClick={handleDirectTip}
-                      disabled={isTipping || !tipAmount}
-                      className="px-4 py-2 bg-[#8B4513] text-[#F5F5DC] text-xs rounded-md font-bold hover:bg-[#654321] disabled:opacity-50 shadow-sm"
-                    >
-                      {isTipping ? "..." : "SEND"}
-                    </button>
-                  </div>
-
-                  {/* Quick select pills - Slightly Larger */}
-                  <div className="flex gap-1.5 overflow-x-auto pb-1 no-scrollbar">
-                    {["0.001", "0.005", "0.01", "0.05"].map((val) => (
+                ) : !showTipInput ? (
+                  <button
+                    onClick={() => setShowTipInput(true)}
+                    className="w-full py-2.5 text-[#8B4513] bg-[#FAF0E6] border cursor-pointer border-[#D2B48C] hover:bg-[#F5F5DC] rounded-lg transition-all text-[14px] font-bold flex items-center justify-center gap-2"
+                  >
+                    <GiftOutlined /> Support the Tutor
+                  </button>
+                ) : (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className="bg-white p-3 rounded-lg border-2 border-[#D2B48C] shadow-inner space-y-3"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-bold text-[#8B4513] uppercase tracking-wider">
+                        Set Tip Amount
+                      </span>
                       <button
-                        key={val}
-                        onClick={() => setTipAmount(val)}
-                        className={`flex-1 min-w-[50px] text-[10px] py-1 rounded-md border-2 transition-all font-bold ${tipAmount === val
+                        onClick={() => setShowTipInput(false)}
+                        className="text-gray-400 hover:text-red-500 transition-colors"
+                      >
+                        <CloseOutlined style={{ fontSize: "12px" }} />
+                      </button>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        step="0.001"
+                        value={tipAmount}
+                        onChange={(e) => setTipAmount(e.target.value)}
+                        className="flex-1 min-w-0 px-3 py-2 text-sm rounded border-2 border-[#FAF0E6] focus:border-[#8B4513] outline-none bg-[#FAF0E6]/30 text-black font-mono font-bold"
+                        placeholder="0.01"
+                      />
+                      <button
+                        onClick={handleDirectTip}
+                        disabled={isTipping || !tipAmount}
+                        className="px-4 py-2 bg-[#8B4513] text-[#F5F5DC] text-xs rounded-md font-bold hover:bg-[#654321] disabled:opacity-50 shadow-sm"
+                      >
+                        {isTipping ? "..." : "SEND"}
+                      </button>
+                    </div>
+
+                    {/* Quick select pills */}
+                    <div className="flex gap-1.5 overflow-x-auto pb-1 no-scrollbar">
+                      {["0.001", "0.005", "0.01", "0.05"].map((val) => (
+                        <button
+                          key={val}
+                          onClick={() => setTipAmount(val)}
+                          className={`flex-1 min-w-[50px] text-[10px] py-1 rounded-md border-2 transition-all font-bold ${tipAmount === val
                             ? "bg-[#8B4513] text-white border-[#8B4513]"
                             : "bg-white border-[#FAF0E6] text-[#8B4513] hover:border-[#D2B48C]"
-                          }`}
-                      >
-                        {val}
-                      </button>
-                    ))}
-                  </div>
-                </motion.div>
-              )}
-            </div>
+                            }`}
+                        >
+                          {val}
+                        </button>
+                      ))}
+                    </div>
+                  </motion.div>
+                )}
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -233,8 +271,7 @@ export default function Courses() {
   const { data: userData } = useUsers(address);
   const { courseCount, isLoading, error } = useGetAllCourses();
   const { data: tutorCourses } = useGetTutorCourses(address);
-  const { enrollInCourse, isPending: enrolling } = useEnrollInCourse();
-  const {
+  const { enrollInCourse, isLoading: enrolling } = useEnrollInCourse(); const {
     createCourse,
     isPending: creatingCourse,
     isConfirming: confirmingCourse,

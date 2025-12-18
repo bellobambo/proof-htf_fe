@@ -32,16 +32,21 @@ export default function SmartWalletIndicator() {
             setIsCreating(true);
             await requestSession();
             toast.success("Wallet Authorized!");
+            
+            // Reload the page after successful wallet creation
+            setTimeout(() => {
+              window.location.reload();
+            }, 1000);
+            
           } catch (e) {
             toast.error("Authorization failed");
-          } finally {
             setIsCreating(false);
           }
         }}
-        className="flex items-center gap-2 bg-[#8B4513] text-[#F5F5DC] px-4 py-1.5 rounded-lg border-2 border-[#5D4037] hover:bg-[#6D4C41] transition-all font-semibold text-sm shadow-sm"
+        className="flex items-center cursor-pointer gap-2 bg-[#8B4513] text-[#F5F5DC] px-4 py-1.5 rounded-lg border-2 border-[#5D4037] hover:bg-[#6D4C41] transition-all font-semibold text-sm shadow-sm"
       >
         <PlusCircleOutlined spin={isCreating} />
-        <span>{isCreating ? "Connecting..." : "Enable Tipping"}</span>
+        <span>{isCreating ? "Connecting..." : "Enable Support"}</span>
       </button>
     );
   }
@@ -65,7 +70,7 @@ export default function SmartWalletIndicator() {
             <span className="text-xs font-bold font-mono text-[#5D4037]">{formattedBalance} ETH</span>
           </div>
         </div>
-        <WalletOutlined className="text-[#8B4513]" />
+        <WalletOutlined style={{ color: "#8B4513" }} />
       </div>
       <button 
         onClick={() => confirm("Reset wallet?") && clearSmartAccountCache()}

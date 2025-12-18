@@ -574,7 +574,7 @@ export function useEnrollInCourse() {
   return {
     enrollInCourse,
     hash,
-    isPending,
+    isLoading: isPending || isConfirming,
     isConfirming,
     isConfirmed,
     error,
@@ -648,5 +648,3 @@ export function useTakeExam() {
     error,
   };
 }
-
-
