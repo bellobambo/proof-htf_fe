@@ -7,7 +7,8 @@ import {
   useAccount,
 } from "wagmi";
 import { CONTRACT_ABI, CONTRACT_ADDRESS } from "./contract";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useSmartSession } from "./useSmartSession";
 
 // Reuse existing interfaces and enums
 export enum UserRole {
@@ -398,7 +399,7 @@ export function useGetPastExamForRevision(examId: bigint | undefined) {
 
     const data = result.data as readonly [
       readonly string[], // questionTexts
-      readonly [string, string, string, string][] // questionOptions
+      readonly [string, string, string, string][], // questionOptions
     ];
 
     console.log("📦 Past Exam Data Received:", {
@@ -573,7 +574,7 @@ export function useEnrollInCourse() {
   return {
     enrollInCourse,
     hash,
-    isPending,
+    isLoading: isPending || isConfirming,
     isConfirming,
     isConfirmed,
     error,
