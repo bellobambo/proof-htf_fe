@@ -106,7 +106,7 @@ function CourseCard({
       setShowTipInput(false);
       setTipAmount("");
     } catch (err: any) {
-      toast.error("Tip failed. Check gas.", { id: "tip-loading" });
+      toast.error("Tip failed. Try again Later.", { id: "tip-loading" });
       console.log(err)
     } finally {
       setIsTipping(false);

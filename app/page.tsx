@@ -12,7 +12,7 @@ import Courses from "./components/Courses";
 export default function Home() {
   const { address, isConnected } = useAccount();
   const { data: userData } = useUsers(address);
-  
+
   const [showCourses, setShowCourses] = useState(false);
 
   // Check if user is already registered on component mount
@@ -30,7 +30,8 @@ export default function Home() {
   if (!isConnected) {
     return (
       <div className="flex min-h-screen bg-[#8B4513] items-center justify-center">
-        <WalletConnect />
+
+                            <h1 className="text-2xl font-bold text-[#F5F5DC]">Proof</h1>
       </div>
     );
   }
