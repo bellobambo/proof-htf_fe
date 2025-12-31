@@ -106,7 +106,7 @@ function CourseCard({
       setShowTipInput(false);
       setTipAmount("");
     } catch (err: any) {
-      toast.error("Tip failed. Ensure you have enough gas and try again.", {
+      toast.error("Tip failed. Ensure you have a stable internet connection.", {
         id: "tip-loading"
       }); console.log(err)
     } finally {
