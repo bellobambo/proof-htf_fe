@@ -9,8 +9,8 @@ Proof leverages **MetaMask Advanced Permissions** with **EIP-7702** to automate 
 
 ### Automated Tutor Tipping
 - Students grant one-time permissions to tip tutors after exams  
-- Limit: up to **0.01 ETH/day**  
-- Expiry: **24 hours**  
+- Limit: up to **0.01 ETH/day**  (Default)
+- Expiry: **24 hours**  (Default)
 - No repeated transaction approvals  
 
 ### Gasless UX
