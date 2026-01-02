@@ -1,13 +1,23 @@
-# Proof  🎓
-Proof is a learning management platform that brings blockchain education to life. Proof connects students and tutors in a decentralized classroom where courses are created, assessments are taken, and scores are recorded on-chain. ✨
+# Proof 🎓
+
+**Proof** is a blockchain-powered assessment platform that connects students and tutors through on-chain exams, transparent scoring, and seamless tutor rewards — delivering a Web2-like UX on Web3 infrastructure.
+
 
 ## 🔐 MetaMask Advanced Permissions Integration
-Built with **MetaMask Smart Accounts Kit** and **EIP-7702**, Proof implements advanced permission controls that enable seamless, gasless interactions:
 
-- **Automated Tipping System**: Students can grant one-time permissions to tip tutors after completing courses without manual transaction approvals for each tip
-- **Streamlined Enrollment**: Course enrollment fees are handled through delegated permissions, removing friction from the onboarding process
-- **Gas Abstraction**: Advanced permissions enable the platform to sponsor transactions on behalf of students, making blockchain education accessible without requiring users to manage gas fees
-- **Secure Token Management**: Students control spending limits and can revoke permissions at any time through MetaMask's permission management interface
+Proof leverages **MetaMask Advanced Permissions** with **EIP-7702** to automate transactions while preserving user control and security.
+
+### Automated Tutor Tipping
+- Students grant one-time permissions to tip tutors after exams  
+- Limit: up to **0.01 ETH/day**  
+- Expiry: **24 hours**  
+- No repeated transaction approvals  
+
+### Gasless UX
+- Gas sponsored by **Pimlico Paymaster**  
+- Executed via **Smart Accounts**  
+- Zero gas management for students  
+
 
 **Metamask Advanced Permissions Code Usage Links:** 
   - https://github.com/bellobambo/proof-htf_fe/blob/main/app/components/SmartWalletIndicator.tsx
@@ -21,19 +31,25 @@ Built with **MetaMask Smart Accounts Kit** and **EIP-7702**, Proof implements ad
 **Social Media Section Regarding Project Integration With MetaMask Advanced Permission:**
 - https://x.com/i/status/2001799621476307359
    
-  
-## 🌍 Powered by Lingo.dev Translation
-Breaking down language barriers in education! The platform integrates [Lingo.dev](https://lingo.dev/en) to provide real-time text translation, allowing students from around the world to learn in their preferred language. With support for Spanish, French, German, Chinese, and Italian, course content and exam questions can be instantly translated, making quality education truly global. 🗣️
+---
+
+## ✨ Platform Features
+
+- **Tutors:** Create exams and manage assessments  
+- **Students:** Take exams, review past questions, track scores on-chain, tip tutors seamlessly  
+- **Global:** Multi-language support via [Lingo.dev](https://lingo.dev/en) (Spanish, French, German, Chinese, Italian)
+
+---
+
+## 🔗 Project Links
+
+- **Live App:** https://proof-htf.vercel.app  
+- **Smart Contract:** `0x6bcEf738a4e1A3753Ae4652A08909a7665E709bd`  
+- **Network:** Ethereum Sepolia Testnet  
+
+**X Demo Posts**
+- https://x.com/i/status/2001799621476307359  
 
 
-This integration leverages EIP-7702 to provide a Web2-like UX while maintaining the security and transparency of blockchain technology.
-
-## 🚀 Key Features
-**For Tutors:** Create courses, build custom exams, and manage your classes.
-
-**For Students:** Browse courses, enroll with one click, take exams, get instant results, track your learning progress on-chain, and tip tutors seamlessly using Advanced Permissions. 
-
-**For Everyone:** The translation drawer lets you convert any text into multiple languages, ensuring no one is left behind due to language barriers.
-
-**Smart Contract:** `0x6bcEf738a4e1A3753Ae4652A08909a7665E709bd`  
-**Backend Repository:** [github.com/bellobambo/Proof-HTF](https://github.com/bellobambo/Proof-HTF)
+**Submission Tracks:** Best Integration & Existing Project  
+Automating transactions with MetaMask Advanced Permissions while preserving security and decentralization ✨
