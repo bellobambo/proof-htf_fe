@@ -43,6 +43,7 @@ Proof leverages **MetaMask Advanced Permissions** with **EIP-7702** to automate 
 
 ## 🔗 Project Links
 
+- **Smart Contract Code:** https://github.com/bellobambo/Proof-HTF
 - **Live App:** https://proof-htf.vercel.app  
 - **Smart Contract:** `0x6bcEf738a4e1A3753Ae4652A08909a7665E709bd`  
 - **Network:** Ethereum Sepolia Testnet  
